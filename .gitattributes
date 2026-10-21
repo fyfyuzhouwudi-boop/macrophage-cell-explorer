@@ -1,0 +1,6 @@
+* text=auto
+/index.html -text
+/src/shell.html -text
+/src/*.css -text
+*.cmd -text
+*.png binary

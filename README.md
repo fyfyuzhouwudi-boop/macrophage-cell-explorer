@@ -1,5 +1,7 @@
 # 巨噬细胞 · 生命内部 / Macrophage Cell Explorer
 
+[下载 Windows 便携包 / Download the Windows portable demo](https://github.com/fyfyuzhouwudi-boop/macrophage-cell-explorer/releases/latest)
+
 一个可旋转、剖切和逐层放大的三维教学演示。通过 **12 个细胞结构入口**和 **3 个示意模式**，观察巨噬细胞内部的空间关系与部分功能过程。
 
 An interactive 3D teaching demo for rotating, sectioning, and exploring a macrophage. **12 structure entries** and **3 illustrative modes** show spatial relationships and selected cellular processes.
