@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.preview-logs/
+.env*
+*.log
+*.map
+qa/
+output/
+staging/
+.DS_Store
+Thumbs.db

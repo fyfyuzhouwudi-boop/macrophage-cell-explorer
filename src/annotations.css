@@ -1,0 +1,42 @@
+/* Notes remain inside the sidebar; labels contain names until explicitly opened. */
+.atlas-note-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: calc(100% - 160px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  background: #fcfdfe;
+  color: #34475e;
+  border: 1px solid #dce4ed;
+  border-radius: 14px;
+  padding: 14px 13px;
+  margin: 0 0 12px;
+}
+.atlas-note-open #journey-panel,
+.atlas-note-open #detail-panel { display: none !important; }
+.atlas-note-heading { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+.sidebar .atlas-note-title { margin: 0; flex: 1; min-width: 0; font-size: 19px; line-height: 1.4; letter-spacing: 0; }
+.atlas-note-close { flex: 0 0 auto; background: #edf2f7; color: #4c627b; border: 1px solid #dce4ed; border-radius: 8px; padding: 6px 8px; font-size: 11px; line-height: 1.4; }
+.atlas-note-body { font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.atlas-note-body p { margin: 0 0 10px; }
+.atlas-note-body strong { font-weight: 650; color: #263e59; }
+.atlas-note-inspect { width: 100%; border: 1px solid #e4b460; border-radius: 20px; background: #fff4df; color: #9a6519; padding: 10px 12px; margin-top: 5px; font-size: 13px; font-weight: 600; }
+.atlas-note-sources { border-top: 1px solid #e2e8ef; padding-top: 10px; margin: 13px 0 8px; font-size: 10px; line-height: 1.7; }
+.atlas-note-sources .atlas-note-label { color: #6b7b8d; margin-bottom: 5px; }
+.atlas-note-sources a { display: block; color: #3e6b8a; text-decoration: underline; margin: 0 0 5px; }
+.atlas-feature-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: -6px 0 14px; max-height: 88px; overflow-y: auto; scrollbar-width: thin; }
+.atlas-feature-chip { border: 1px solid #dce5ec; background: #f5f9fc; color: #47637a; border-radius: 14px; font-size: 10px; line-height: 1.5; padding: 4px 7px; max-width: 100%; text-align: left; }
+.atlas-feature-chip:hover { border-color: #b7cddc; background: #edf5fa; }
+.sidebar-footer .atlas-annotations-toggle { flex: 0 0 auto; font-size: 10px; line-height: 1.4; padding: 6px; border: 1px solid #dce4ed; border-radius: 9px; color: #4d647b; background: #f9fbfd; }
+.sidebar-footer .atlas-annotations-toggle[aria-pressed="false"] { color: #8c6a33; background: #fff7e9; border-color: #e7d4b4; }
+.atlas-note-open .organelle-picker { margin-top: 12px; min-height: 76px; }
+[data-atlas-annotation-hidden="true"] { display: none !important; }
+@media (max-height: 900px) {
+  .atlas-note-panel { max-height: calc(100% - 130px); padding: 11px; margin-bottom: 8px; }
+  .sidebar .atlas-note-title { font-size: 17px; }
+  .atlas-note-body { font-size: 11px; line-height: 1.75; }
+  .atlas-note-body p { margin-bottom: 8px; }
+  .atlas-feature-chips { margin-bottom: 10px; max-height: 73px; }
+  .atlas-note-open .organelle-picker { min-height: 60px; }
+}
