@@ -279,39 +279,39 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
   instance("ribosome", smoothShared(deformedBall(1, 2)), riboMat, ribos, erGroup);
   location("er", confineERWorldPoint(new THREE.Vector3(-0.42, -0.17, 0.7)).toArray(), 1.5);
   location("ribosome", confineERWorldPoint(new THREE.Vector3(-2.67, -1.48, 0.8)).toArray(), 0.6);
-  const golgiCenter = new THREE.Vector3(0.4, -2.62, 1.05), golgiGroup = new THREE.Group();
-  golgiGroup.position.copy(golgiCenter);
-  group.add(golgiGroup);
-  const golgiMat = standard("#d99691", 0.34, { bumpScale: 9e-3 }), golgiLipMat = standard("#e4aba1", 0.31, { bumpScale: 7e-3 });
-  for (let layer = 0; layer < 8; layer++) {
-    const len = 1.62 - 0.075 * Math.abs(layer - 3) + 0.06 * Math.sin(layer * 1.8), y = (layer - 3.5) * 0.255;
-    const geo = surface(80, 20, (u, v2) => {
-      const x = (u * 2 - 1) * len, chi = v2 * TAU, bend = 0.33 * (x / len) ** 2 + 0.075 * Math.sin(x * 3 + layer * 0.35) + 0.035 * Math.sin(x * 6 + layer * 0.1);
-      return new THREE.Vector3(x + 0.055 * Math.sin(layer * 1.7), y + bend + (0.072 + 0.018 * Math.cos(x * 3 + layer * 0.2)) * Math.cos(chi), 0.1 + 0.1 * Math.cos(x * 2 + layer * 0.4) + Math.sin(chi) * (0.39 + 0.07 * Math.cos(x * 2 + layer * 0.25)) + layer * 0.025);
+  // Preserve the shared random sequence consumed by the former 42 Golgi
+  // carrier placements (five draws each). Other organelles stay byte-identical.
+  for (let i = 0; i < 42 * 5; i++) rand();
+  // Move the new complete stack forward to avoid the existing ER envelope;
+  // uniform scale preserves the TGN tubes' cross-sections and shared lumen.
+  const golgiCenter = new THREE.Vector3(0.4, -2.62, 1.85);
+  const golgiPlaced = component("golgi", golgiCenter.toArray(), 1.1, [0, 0, 0], 0, false);
+  const golgiGroup = golgiPlaced?.holder ?? new THREE.Group();
+  golgiGroup.name = "WholeGolgiSevenCisternaeAndTGN";
+  if (golgiPlaced) {
+    golgiPlaced.component.group.traverse((object) => {
+      if (!object.isMesh) return;
+      // The collision query recognizes each actual closed boundary, including
+      // the new TGN; carrier visibility remains independent of Golgi cisternae.
+      object.userData.compartmentBoundary = object.userData.shell === true;
+      if (object.userData.secretoryDomain === "carriers") object.userData.componentKey = "transport-vesicles";
     });
-    add(new THREE.Mesh(geo, layer % 3 === 0 ? golgiLipMat : golgiMat), "golgi", golgiGroup);
-    const lip = [];
-    for (let j = 0; j < 70; j++) {
-      const x = (j / 69 * 2 - 1) * len;
-      lip.push(new THREE.Vector3(x, y + 0.33 * (x / len) ** 2 + 0.075 * Math.sin(x * 3 + layer * 0.35) + 0.035 * Math.sin(x * 6 + layer * 0.1), 0.49 + 0.1 * Math.cos(x * 2 + layer * 0.4) + 0.07 * Math.cos(x * 2 + layer * 0.25) + layer * 0.025));
-    }
-    add(curveMesh(lip, 0.026, golgiLipMat, 70, 6), "golgi", golgiGroup);
-    for (const sign of [-1, 1]) {
-      const bud = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), golgiMat);
-      bud.position.set(sign * len, y + 0.28, 0.1 + layer * 0.022);
-      bud.scale.set(0.76, 0.8, 3.8);
-      add(bud, "golgi", golgiGroup);
-    }
+    golgiGroup.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(golgiGroup), vertex = new THREE.Vector3();
+    let radiusFromLocation = 0;
+    golgiGroup.traverse((object) => {
+      if (!object.isMesh) return;
+      const position = object.geometry.attributes.position;
+      for (let i = 0; i < position.count; i++) {
+        vertex.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld);
+        radiusFromLocation = Math.max(radiusFromLocation, vertex.distanceTo(golgiCenter));
+      }
+    });
+    golgiPlaced.boundsLocal = box;
+    golgiPlaced.radiusFromLocation = radiusFromLocation;
+    golgiPlaced.boundsCoordinateSpace = "whole-local";
   }
-  const golgiVesicles = [];
-  for (let i = 0; i < 42; i++) {
-    const a = rand() * TAU, r = 1.65 + rand() * 0.58;
-    golgiVesicles.push({ p: [Math.cos(a) * r, Math.sin(a) * (1.13 + rand() * 0.38), 0.12 + rand() * 0.6], r: 0.08 + rand() * 0.09, c: i % 3 ? "#dbaca0" : "#efc1b5" });
-  }
-  const golgiTransportVesicles = instance("golgi", deformedBall(1, 2), golgiMat, golgiVesicles, golgiGroup);
-  golgiTransportVesicles.name = "GolgiTransportVesicles";
-  golgiTransportVesicles.userData.componentKey = "transport-vesicles";
-  location("golgi", golgiCenter.toArray(), 1.8);
+  location("golgi", golgiCenter.toArray(), golgiPlaced?.radiusFromLocation ?? 1.8);
   function component(id, position, scale = 1, rotation = [0, 0, 0], section = 0.72, detail = false) {
     if (typeof createOrganelle !== "function") return null;
     const c = createOrganelle(id, { detail, connectedER: id === "nucleus" });
@@ -699,7 +699,7 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
   }
   group.userData = { ...group.userData, teachingOnly: true, description: "Reference-directed 3D macrophage cutaway; enlarged organelle and molecular proportions for exhibition. All surfaces are meshes, not a raster backdrop.", sectionAmount, foldPatches: plasmaMembrane.diagnostics().foldPatches };
   group.updateWorldMatrix(true, true);
-  return { group, pickables, organelleLocations, setSection, setProgress, surfaceRadius, membraneSurface: plasmaMembrane.membraneSurface, plasmaMembrane, update, dispose, radius: 7.8, components: { nucleus: nuclearPlaced, mitochondria, lysosomes, microtubuleTracks }, nuclearPoreSites, metadata: { teachingOnly: true, organelleCount: organelleLocations.size, foldPatches: plasmaMembrane.diagnostics().foldPatches, representativeVesicleCounts: { lysosome: 3, endosome: 3, phagosome: 1, peroxisome: 3 }, vesicleTeachingScope: "Representative stages and content domains; shapes overlap and displayed counts are not an abundance measurement", erCisternae: 11, erIntercisternalSharedNecks: 20, continuousNuclearER: true, nuclearSharedPorts: 1, nuclearPores: 32, golgiCisternae: 8, mitochondria: mitoSites.length } };
+  return { group, pickables, organelleLocations, setSection, setProgress, surfaceRadius, membraneSurface: plasmaMembrane.membraneSurface, plasmaMembrane, update, dispose, radius: 7.8, components: { nucleus: nuclearPlaced, golgi: golgiPlaced, mitochondria, lysosomes, microtubuleTracks }, nuclearPoreSites, metadata: { teachingOnly: true, organelleCount: organelleLocations.size, foldPatches: plasmaMembrane.diagnostics().foldPatches, representativeVesicleCounts: { lysosome: 3, endosome: 3, phagosome: 1, peroxisome: 3 }, vesicleTeachingScope: "Representative stages and content domains; shapes overlap and displayed counts are not an abundance measurement", erCisternae: 11, erIntercisternalSharedNecks: 20, continuousNuclearER: true, nuclearSharedPorts: 1, nuclearPores: 32, golgiCisternae: golgiPlaced?.component.stats.cisternae ?? 0, golgiTGN: Boolean(golgiPlaced?.component.stats.continuousTGN), mitochondria: mitoSites.length } };
 }
 export {
   createWholeAtlas

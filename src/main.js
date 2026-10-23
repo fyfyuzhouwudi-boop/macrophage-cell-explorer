@@ -8,6 +8,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { SavePass } from "three/addons/postprocessing/SavePass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { createOrganelle, ORGANELLE_IDS } from "./organelle-models.js";
+import { createFusionLab, FUSION_IDS, FUSION_CATALOG } from "./fusion-lab.js";
+import { createDetailLearningControls } from "./detail-learning-controls.js";
 import { createMolecularModel, MOLECULAR_IDS, MOLECULAR_CATALOG } from "./molecular-models.js";
 import { createMembranePatch } from "./membrane-patch.js";
 import {createCellSurfacePatch,CELL_SURFACE_PATCH_ID,CELL_SURFACE_PATCH_GUIDE} from "./cell-surface-patch.js";
@@ -65,14 +67,15 @@ const catalog = {
   ribosome: { name: "核糖体", color: "#c6a2a7", summary: "没有膜包围的翻译复合体。探索大、小亚基之间的空间与RNA链。" }
 };
 Object.assign(catalog,MOLECULAR_CATALOG);
+Object.assign(catalog,FUSION_CATALOG);
 catalog["membrane-patch"]={name:"柔软膜褶皱局部",color:"#9cb7bd",summary:STRUCTURE_GUIDE["membrane-patch"].function};
 catalog[CELL_SURFACE_PATCH_ID]={name:"微绒毛与膜活动",color:"#8eafb5",summary:CELL_SURFACE_PATCH_GUIDE.function};
-const LOCAL_IDS=[...MOLECULAR_IDS,"membrane-patch",CELL_SURFACE_PATCH_ID];
+const LOCAL_IDS=[...MOLECULAR_IDS,...FUSION_IDS,"membrane-patch",CELL_SURFACE_PATCH_ID];
 const EXPLORABLE_IDS=[...ORGANELLE_IDS,...LOCAL_IDS];
 const phases = [{ name: "吞噬", at: 0, desc: "细胞膜包围颗粒，形成独立的吞噬体。" }, { name: "成熟", at: 0.38, desc: "吞噬体向细胞内部运输，与内体和溶酶体交换组分。" }, { name: "降解", at: 0.78, desc: "在膜围成的腔内，材料逐渐被水解酶分解。" }];
 const viralPhases = VIRAL_STAGES.map((stage,index) => ({ name: index===5?"自分泌 IFN 与基因应答":stage.title, at: stage.at, desc: index===5?"此例选择本细胞分泌的胞外 IFN-β 返回同一细胞：接合 IFNAR2，招募 IFNAR1 形成有限组装教学状态，再显示胞质 JAK 激活及 STAT / ISG 应答。距离与速度为教学放大，不表示所有病毒均被清除。":stage.desc }));
 const state = { view: "whole", selected: null, level: "whole", playing: false, speed: 1, section: 0.72, progress: 0, scenario: "structure", quality: "high", ambientTime:0, micro: false, patchSurface: false, following: false, viralFocused:false, viralFocusLabelId:null, connectedER: false, cameraHome: true, ready: false, time: 0 };
-let visibility=null,uptakeControls=null,reactionFocus=null,surfaceActivity=null,cytoskeletonNetwork=null,cytoplasmMotion=null,explorationControls=null;
+let visibility=null,uptakeControls=null,reactionFocus=null,surfaceActivity=null,cytoskeletonNetwork=null,cytoplasmMotion=null,explorationControls=null,learningControls=null;
 const viralBoundaryNote=document.createElement("p");viralBoundaryNote.id="viral-boundary-note";viralBoundaryNote.className="process-boundary-note uptake-omission";viralBoundaryNote.hidden=true;$("phase-list").insertAdjacentElement("afterend",viralBoundaryNote);
 const viralBoundaryText=["胞外与已内化为分段状态；内陷与裂分省略。","内体腔内处理；此处不连接到胞质RNA。","独立条件：可识别RNA已经位于胞质。","宿主IRF3经核孔入核；不运输病毒颗粒。","ER后、Golgi后及释放后关键帧；出芽与融合省略。","自分泌示例：配体接合 → 两链靠拢 → 胞质 JAK 激活。形状与时序为教学表达。"];
 const visibilityReturnWaiters=[];
@@ -192,7 +195,7 @@ prepareShadows(whole.group);
 whole.setProgress(0.38);
 const steady=createSteadyAtlas({whole});
 scene.add(steady.group);
-for(const [id,parentId] of [["tubulin-structure","cytoskeleton"],["ribosome-structure","ribosome"],["membrane-patch","er"],[CELL_SURFACE_PATCH_ID,"membrane"]]){const site=whole.organelleLocations.get(parentId);whole.organelleLocations.set(id,{position:site.position.clone(),radius:.35,label:catalog[id].name});}
+for(const [id,parentId] of [["tubulin-structure","cytoskeleton"],["ribosome-structure","ribosome"],["membrane-patch","er"],[CELL_SURFACE_PATCH_ID,"membrane"],["snare-fusion","lysosome"],["ha-fusion","endosome"]]){const site=whole.organelleLocations.get(parentId);whole.organelleLocations.set(id,{position:site.position.clone(),radius:.35,label:catalog[id].name});}
 const viral = createViralAtlas({ whole });
 configureMaterialGroup(viral.group);
 scene.add(viral.group);
@@ -293,6 +296,10 @@ function worldAnchor(key2) {
   return active.anchors[key2].clone().applyMatrix4(active.group.matrixWorld);
 }
 function computeDetailPose(direction = new THREE.Vector3(0.18, 0.13, 1)) {
+  if(FUSION_IDS.includes(activeId)){
+    const inside=state.level==="inside",position=worldAnchor(inside?"conformationCamera":"overviewCamera"),target=worldAnchor(inside?"conformationTarget":"overviewTarget"),scale=activeScale();
+    return{position,target,near:Math.max(1e-5,.002*scale),far:110,minDistance:.12*scale,maxDistance:active.radius*scale*5};
+  }
   if(activeId==="membrane"&&state.level==="inside"&&active.anchors.conformationCamera){
     const position=worldAnchor("conformationCamera"),target=worldAnchor("conformationTarget"),scale=activeScale(),distance=position.distanceTo(target);
     return{position,target,near:Math.max(1e-5,.002*scale),far:110,minDistance:distance*.06,maxDistance:active.radius*scale*4};
@@ -356,13 +363,13 @@ function loadDetail(id, connected) {
   const key2 = connected ? "er-connection" : id;
   let model = detailCache.get(key2);
   if (!model) {
-    model = id === CELL_SURFACE_PATCH_ID ? createCellSurfacePatch({detail:true}) : id === "membrane-patch" ? createMembranePatch({detail:true}) : MOLECULAR_IDS.includes(id) ? createMolecularModel(id,{detail:true}) : createOrganelle(id, { detail: true, connectedER: connected });
+    model = FUSION_IDS.includes(id) ? createFusionLab({caseId:id,detail:true}) : id === CELL_SURFACE_PATCH_ID ? createCellSurfacePatch({detail:true}) : id === "membrane-patch" ? createMembranePatch({detail:true}) : MOLECULAR_IDS.includes(id) ? createMolecularModel(id,{detail:true}) : createOrganelle(id, { detail: true, connectedER: connected });
     if (connected) model.group.traverse((o) => {
       if (/Chromatin|Nucleolus|Nucleolar/.test(o.name)) o.visible = false;
     });
     model.group.updateMatrixWorld(true);
     detailBounds.set(model, new THREE.Box3().setFromObject(model.group));
-    if(id===CELL_SURFACE_PATCH_ID&&model.metadata?.guide)STRUCTURE_GUIDE[id]=model.metadata.guide;
+    if(model.metadata?.guide)STRUCTURE_GUIDE[id]=model.metadata.guide;
     detailCache.set(key2, model);
     visibility?.registerDetail(model,{id,connectedER:connected});
     detailRoot.add(model.group);
@@ -484,6 +491,9 @@ function resolveWholeSource(id, hit, model, connected) {
       radius = hit.object.geometry.boundingSphere.radius * rawHitMatrix.getMaxScaleOnAxis();
       kind = "actual-instance-frame";
     } else if (id === "golgi") {
+      if(whole.components.golgi?.holder){
+        carrier=whole.components.golgi.holder;matrix.copy(carrier.matrixWorld);focus.copy(carrier.getWorldPosition(new THREE.Vector3()));radius=model.radius*matrix.getMaxScaleOnAxis();kind="actual-component-frame";
+      }else{
       carrier = hit?.object;
       while (carrier?.parent && carrier.parent !== whole.group) carrier = carrier.parent;
       if (!carrier || carrier === whole.group) carrier = whole.group.children.find((o) => o.isGroup && o.children.some((c) => c.userData.organelleId === "golgi"));
@@ -493,6 +503,7 @@ function resolveWholeSource(id, hit, model, connected) {
       const orientation = carrier.getWorldQuaternion(new THREE.Quaternion());
       matrix.compose(focus, orientation, new THREE.Vector3().setScalar(radius / localRadius)).multiply(new THREE.Matrix4().makeTranslation(-localCenter.x, -localCenter.y, -localCenter.z));
       kind = "actual-semantic-carrier";
+      }
     } else {
       carrier = hit?.object ?? null;
       if (hit) focus.copy(hit.point);
@@ -504,7 +515,7 @@ function resolveWholeSource(id, hit, model, connected) {
         focus.copy(membraneHit.point).applyMatrix4(whole.group.matrixWorld);
         normal.copy(membraneHit.normal).applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(whole.group.matrixWorld)).normalize();
       }
-      const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal.lengthSq() > 0 ? normal : new THREE.Vector3(0, 0, 1));
+      const rotation = FUSION_IDS.includes(id)?new THREE.Quaternion():new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal.lengthSq() > 0 ? normal : new THREE.Vector3(0, 0, 1));
       if (id === "membrane") {
         const tangent = new THREE.Vector3(0,1,0).cross(normal);
         if (tangent.lengthSq() > 1e-8) {
@@ -881,6 +892,7 @@ function renderStructureGuide(id, connected = false) {
     name.textContent = feature.name + (feature.visible ? "" : " · 背景知识");
     const description = document.createElement("dd");
     description.textContent = feature.function + (feature.visible ? "" : "（本模型未单独建出。）") + (feature.note ? " " + feature.note : "");
+    if(feature.location)guideText(description,"位置："+feature.location,"feature-location");
     list.append(name, description);
   }
   host.append(list);
@@ -1035,6 +1047,13 @@ function syncUI() {
     $("subtitle").textContent="内质网膜局部 · 水性薄腔";
     $("view-hint").textContent="薄腔水相内 · 前方为通用跨膜符号的腔侧端 · 拖动环视";
   }
+  if(detail&&FUSION_IDS.includes(state.selected)){
+    $("detail-kicker").textContent="膜融合 · 独立微观案例";
+    $("micro-button").textContent=state.micro?"返回融合总览":"靠近膜接触区";
+    $("inside-note").textContent="两张膜各有两个脂质叶。观察蛋白如何拉近膜，再逐步查看接触、半融合与水性孔。";
+    $("view-hint").textContent="选择阶段或拖动进度 · 空格播放/暂停 · 拖动环视";
+  }
+  learningControls?.sync();
   syncPhase();
   $("follow-button").disabled=state.scenario === "structure"&&!steady.activityFocus(state.ambientTime);
   uptakeControls?.renderUI();
@@ -1225,6 +1244,11 @@ function updateCallouts() {
 visibility=createAtlasVisibility({container:$("visibility-host"),whole,onBeforeHide:async({keys,hidesCurrent,canShowAfter})=>{uptakeControls?.beforeHide(canShowAfter);if(state.scenario==="virus"&&state.view==="whole"&&!navigation&&state.viralFocused&&!viralFocusedTargetVisible(canShowAfter)){transition=null;clearOrbitMomentum();reactionFocus?.leave("hidden");state.viralFocused=false;state.viralFocusLabelId=null;frameWhole();}if(hidesCurrent || activeFocusWillHide(canShowAfter) || state.connectedER&&(keys.includes("nucleus")||keys.includes("er"))){await new Promise(resolve=>{visibilityReturnWaiters.push(resolve);returnWhole();});}annotations?.close();},onChange:()=>{steady.setVisibilityFilter?.(id=>visibility.canShowLabel(id));syncUI();},onError:error=>{errors.push("Visibility: "+error.message);$("status").textContent="隐藏操作未完成，可重试或恢复全部。";}});
 cytoskeletonNetwork=createCytoskeletonNetwork({THREE,whole,detail:true});
 cytoplasmMotion=createCytoplasmMotion({THREE,whole,membraneQueries:cytoskeletonNetwork.debug.membraneQueries});
+const motionControl=document.createElement("label");motionControl.className="cytoplasm-motion-control";
+motionControl.innerHTML='<input id="cytoplasm-motion-toggle" type="checkbox" checked>淡淡胞质微动 · 随播放显示';
+motionControl.title="局部缓慢回旋与扰动的教学表现，不是整颗巨噬细胞的统一环流。";
+$("relationship-note").insertAdjacentElement("afterend",motionControl);
+$("cytoplasm-motion-toggle").addEventListener("change",e=>{cytoplasmMotion.setEnabled(e.target.checked);requestRender();});
 const legacySkeletonArchive=new THREE.Group();legacySkeletonArchive.name="LegacyCytoskeletonArchive";legacySkeletonArchive.visible=false;whole.group.add(legacySkeletonArchive);
 for(const {object}of cytoskeletonNetwork.replacementTargets)legacySkeletonArchive.add(object);
 whole.group.add(cytoskeletonNetwork.group);cytoskeletonNetwork.group.visible=true;
@@ -1261,6 +1285,16 @@ $("back-button").addEventListener("click", returnWhole);
 $("micro-button").addEventListener("click", toggleMicro);
 $("surface-patch-button").addEventListener("click",()=>viewModel(CELL_SURFACE_PATCH_ID));
 explorationControls=createExplorationControls({THREE,state,whole,network:cytoskeletonNetwork,camera,controls,visibility,isNavigating:()=>Boolean(navigation),animatePose,requestRender,syncUI,switchScenario,uptakeControls,viral,reactionFocus});
+learningControls=createDetailLearningControls({state,getActive:()=>active,getGuide:()=>STRUCTURE_GUIDE[state.selected],isNavigating:()=>Boolean(navigation),viewModel,requestRender,syncUI,onPlaybackEdit:()=>inspectionPlayChanged=true,fusionIds:FUSION_IDS,focusAnchor(entry){
+  if(!active||navigation)return;
+  if(entry.id==="smooth-er"){$("smooth-er-button").click();return;}
+  if(!active.anchors[entry.camera]||!active.anchors[entry.target])return;
+  active.setObservationMode?.(false);const fromSection=active.group.userData.section??state.section;
+  state.level=entry.inside?"inside":"surface";state.micro=Boolean(entry.inside);state.patchSurface=false;state.section=entry.inside?0:(entry.section??0);microTextureScale(entry.inside?true:false);
+  const position=worldAnchor(entry.camera),target=worldAnchor(entry.target),scale=activeScale(),distance=position.distanceTo(target);
+  const pose={position,target,near:Math.max(1e-6,Math.min(.002*scale,distance*.015)),far:110,minDistance:Math.max(1e-6,distance*.06),maxDistance:active.radius*scale*5};
+  animatePose(position,target,.75,{pose,arc:!entry.inside,sectionFrom:fromSection,sectionTo:state.section,closeLate:Boolean(entry.inside)});syncUI();$("subtitle").textContent=catalog[state.selected].name+" · "+entry.title;
+}});
 surfaceActivity=createSurfaceActivityControls({THREE,state,getActive:()=>active,isNavigating:()=>Boolean(navigation),visibility,setDetailTime:v=>detailTime=v,markPlaybackEdit:()=>inspectionPlayChanged=true,animatePose,requestRender,syncUI});
 $("surface-motion-button").addEventListener("click",()=>{
  if (navigation || !surfaceTargetVisible()) return;
@@ -1412,6 +1446,15 @@ renderer.domElement.addEventListener("pointerup", (e) => {
     state.cameraHome = false;
     return;
   }
+  if(state.view==="detail"&&active?.metadata?.secretoryDetails&&!navigation){
+    const rect=renderer.domElement.getBoundingClientRect();mouse.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(mouse,camera);
+    for(const hit of raycaster.intersectObject(active.group,true)){
+      let shown=true;for(let node=hit.object;node;node=node.parent)if(!node.visible){shown=false;break;}if(!shown||hit.object.userData.pickThrough)continue;
+      const mat=Array.isArray(hit.object.material)?hit.object.material[hit.face?.materialIndex??0]:hit.object.material;if(!mat||mat.visible===false||mat.opacity<.025||mat.clippingPlanes?.some(p=>p.distanceToPoint(hit.point)<-1e-5))continue;
+      const domain=hit.object.userData.secretoryDomainByMaterial?.[hit.face?.materialIndex??0]??hit.object.userData.secretoryDomain;
+      if(domain)learningControls?.focusById(domain);break;
+    }return;
+  }
   if (state.view !== "whole") return;
   if(state.uptakeLocal&&uptakeControls.pick(e))return;
   const rect = renderer.domElement.getBoundingClientRect();
@@ -1543,7 +1586,8 @@ function animate(now) {
   }
   reactionFocus?.update(raw);
   if (state.scenario === "structure") steady.update(state.ambientTime);
-  if (active) active.update(detailTime, navigation ? 0 : dt);
+  if (active && state.view === "detail") active.update(detailTime, navigation ? 0 : dt);
+  learningControls?.update();
   updateMembraneActivityStatus();
   surfaceActivity?.updateLOD(camera,renderer.domElement.clientHeight);surfaceActivity?.update();
   const detailScale = active && state.view === "detail" ? activeScale() : 1;
@@ -1592,7 +1636,7 @@ Promise.allSettled(textureReadiness.map((item) => item.ready)).then((results) =>
   requestRender();
   $("loader").style.opacity = 0;
   setTimeout(() => $("loader").hidden = true, 550);
-  $("status").textContent = failedSources.size ? "基础三维场景已就绪，部分艺术纹理未载入。" : "三维细胞已就绪：12种结构与4个代表性局部可探索";
+  $("status").textContent = failedSources.size ? "基础三维场景已就绪，部分艺术纹理未载入。" : `三维细胞已就绪：12种结构与${LOCAL_IDS.length}个代表性局部可探索`;
   requestAnimationFrame(animate);
 });
 function navigationDiagnostics() {
@@ -1600,6 +1644,7 @@ function navigationDiagnostics() {
   return { active: Boolean(navigation), phase: navigation?.phase ?? (inspection ? "detail-idle" : navigationLast.phase), direction: navigation?.direction ?? null, selected: navigation?.selected ?? activeId, source, matchedDetailMatrix: detailRoot.matrixWorld.toArray(), entryWhole: inspection ? { camera: inspection.entry.position.toArray(), target: inspection.entry.target.toArray(), near: inspection.entry.near, far: inspection.entry.far, minDistance: inspection.entry.minDistance, maxDistance: inspection.entry.maxDistance, section: inspection.section, progress: inspection.progress, playing: inspection.playing, cameraHome: inspection.cameraHome, aspect: inspection.aspect } : null, returnWhole: inspection?.returnWhole ?? navigationLast.returnWhole ?? null, macroProgressFrozen: Boolean(inspection), detailTime, pendingCommand: pendingCommand?.type ?? null, handoffPassesEnabled: Boolean(capturePass?.enabled || blendPass?.enabled), sectionOwnership: "Factory local planes and section bindings; factory alone maps planes by active.group.matrixWorld" };
 }
 window.addEventListener("pagehide", () => {
+  learningControls?.dispose();
   cytoplasmMotion?.dispose();
   surfaceDetail?.dispose();
   explorationControls?.dispose();if(cytoskeletonNetwork){whole.group.remove(cytoskeletonNetwork.group);cytoskeletonNetwork.dispose();}surfaceActivity?.dispose();reactionFocus?.dispose();focusDOF.dispose();

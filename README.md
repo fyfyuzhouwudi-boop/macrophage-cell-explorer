@@ -10,6 +10,30 @@ An interactive 3D teaching demo for rotating, sectioning, and exploring a macrop
 
 The interface is primarily in Simplified Chinese; this README is bilingual. Visuals and interactions are still being refined.
 
+## 膜、细胞器与融合过程 / Membranes, organelles and fusion
+
+**12 个主要结构入口 + 6 个局部实例。** 主要结构包括细胞核、内质网、高尔基体、线粒体、溶酶体、内体、细胞膜、细胞骨架、核孔复合体、吞噬体、过氧化物酶体和核糖体。局部实例包括微管蛋白坐标、核糖体坐标、ER 膜褶皱、微绒毛与膜活动、SNARE 融合和流感 HA 融合。核孔与核糖体也计作结构入口，不把这 18 项统称为 18 种细胞器。
+
+**12 main structure entries + 6 local examples.** The main entries cover the nucleus, ER, Golgi, mitochondria, lysosomes, endosomes, plasma membrane, cytoskeleton, nuclear pore complex, phagosome, peroxisomes and ribosome. Local examples cover tubulin coordinates, ribosome coordinates, an ER membrane fold, microvilli/membrane activity, SNARE fusion and influenza HA fusion. These entries are not a count of 18 distinct organelle types.
+
+| 想观察什么 / Explore | 操作 / Action |
+|---|---|
+| 双层与贯膜蛋白 / Bilayer and membrane spans | 点击“细胞膜”，观察两叶图例，再切换表面、剖切或局部放大。 / Select the plasma membrane and use the surface, section and local views. |
+| 粗面、光面与 ER 腔 / Rough ER, smooth ER and lumen | 点击“内质网”，使用“放大查看构造”；连接视图显示外核膜及核周隙的连续关系。 / Select ER and use its focus buttons; the connected view shows nuclear-envelope continuity. |
+| cis—medial—trans—TGN | 点击“高尔基体”，逐区放大，或选择“进入中间囊腔”。 / Select Golgi and focus on a region or enter the medial cisterna. |
+| 轻微胞质运动 / Subtle cytoplasmic motion | 在整胞视图播放，用“淡淡胞质微动”开关控制轨迹。 / Play the whole-cell view and use the cytoplasmic-motion toggle. |
+| 蛋白如何促成融合 / How proteins promote fusion | 在摄取或病毒应答视图打开 SNARE 或 HA 案例；点选阶段、拖动进度、暂停或重播。 / Open a SNARE or HA example, select stages, scrub, pause or replay. |
+| 水性融合孔 / Aqueous fusion pore | 到达开孔阶段后点击“沿融合孔向内看”，拖动环视。 / At an open-pore stage, use the pore-view button and drag to look around. |
+
+蓝、玫瑰、琥珀色分别标示细胞膜胞外叶、胞质叶和疏水双尾，属于教学配色。粗面和光面 ER 共用连续腔；Golgi 各层与 TGN 的区室关系分别说明。胞质轨迹是受限局部扰动，不能解释为实测的整体环流。SNARE 案例与流感 HA 案例具有不同膜侧朝向和区室标签；HA 示例从内化后开始，依赖适当酸化条件，不预测巨噬细胞的生产性感染。
+
+Blue, rose and amber encode the extracellular leaflet, cytoplasmic leaflet and hydrophobic tails for teaching. Rough and smooth ER share a continuous lumen; Golgi cisternae and TGN compartments are explained separately. Cytoplasmic trails illustrate confined fluctuations rather than measured bulk circulation. SNARE and HA examples have different compartment labels and sidedness. The HA example starts after uptake and assumes appropriate acid activation; it does not predict productive macrophage infection.
+
+本次新增形体依据论文及电镜构象信息设计，比例、配色、显示数量和动画速度均作展示调整。既有公开坐标实例与这些教学形体分别标注。详细参考与适用范围见来源附录。
+
+The new geometry is informed by published research and EM conformational information, with illustrative scale, colors, copy numbers and timing. Existing public-coordinate examples remain separately identified. See the source appendix for claim-specific evidence and limitations.
+
+
 ## 直接打开 / Open offline
 
 1. 下载整个项目 ZIP，并完整解压。

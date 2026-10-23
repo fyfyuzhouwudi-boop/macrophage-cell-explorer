@@ -4,7 +4,7 @@ export const VISIBILITY_GROUPS = Object.freeze([
   { id: 'information', label: '遗传与合成', keys: ['nucleus', 'pore', 'er', 'ribosome'] },
   { id: 'processing', label: '分选与处理', keys: ['golgi', 'transport-vesicles', 'endosome', 'phagosome', 'lysosome'] },
   { id: 'metabolism', label: '能量与氧化代谢', keys: ['mitochondria', 'peroxisome'] },
-  { id: 'coordinates', label: '分子与膜局部实例', keys: ['tubulin-structure', 'ribosome-structure', 'membrane-patch', 'surface-patch', 'microvilli'] },
+  { id: 'coordinates', label: '分子与膜局部实例', keys: ['tubulin-structure', 'ribosome-structure', 'membrane-patch', 'surface-patch', 'microvilli', 'snare-fusion', 'ha-fusion'] },
   { id: 'collaboration', label: '功能关系', keys: ['collaboration'] },
   { id: 'scenario', label: '摄取与应答', keys: ['uptake-particles','uptake-ligands','uptake-receptors','viral-particles'] }
 ]);
@@ -30,6 +30,8 @@ export const VISIBILITY_PARTS = Object.freeze({
   'tubulin-structure': { label: '微管蛋白坐标实例', inspectable: true, scope: '独立来源结构，不增加细胞器种类', requires: ['cytoskeleton', 'microtubules'] },
   'ribosome-structure': { label: '核糖体坐标实例', inspectable: true, scope: '独立来源结构，不增加细胞器种类', requires: ['ribosome'] },
   'membrane-patch': { label: '柔软膜褶皱局部', inspectable: true, scope: '内质网膜局部示意；程序化，非实测电镜/原子模型', requires: ['er'] },
+  'snare-fusion': {label:'SNARE 囊泡融合实例',inspectable:true,scope:'晚期内体/溶酶体膜融合的独立教学局部'},
+  'ha-fusion': {label:'流感 HA 包膜融合实例',inspectable:true,scope:'低 pH 条件下的独立病毒包膜融合局部；不等于宿主细胞有效感染'},
   'surface-patch': { label: '微绒毛与膜活动局部', inspectable: true, scope: '细胞表面代表膜局部；教学形态，不增加细胞器或冒称整胞所有突起为微绒毛', requires: ['membrane'] },
   microvilli: { label: '局部膜突起（整片控制）', scope: '连续局部膜壁无法只隐突起，因此控制整个表面膜片及其芯/符号；不控制整胞伪足、膜褶皱或内质网', requires: ['surface-patch', 'membrane'] },
   collaboration: { label: '稳态协作指示', scope: '方向/关系示意，不是实体管道' },

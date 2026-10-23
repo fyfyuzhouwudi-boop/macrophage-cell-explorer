@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "node serve.mjs",
-    "preview": "node tools/preview.mjs --launch"
+    "preview": "node tools/preview.mjs --launch",
+    "test": "node --test tests/*.mjs"
   },
   "dependencies": {
     "@phosphor-icons/core": "2.1.1",

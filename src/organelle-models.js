@@ -3,6 +3,7 @@ import { buildPlasmaMembraneDetail } from "./plasma-membrane-detail.js";
 import { createContinuousMitoCore } from "./atlas-geometry.js";
 import { createNuclearERGeometry } from "./nuclear-er-continuum.js";
 import { attachSmoothERNetwork, attachSERToNuclearER } from "./er-smooth-network.js";
+import { createTransGolgiNetwork } from "./secretory-golgi-network.js";
 import MICRO_TEXTURES from "./micro-texture-data.js";
 import ER_PLACEMENTS from "./er-placement-data.js";
 import MITO_PLACEMENTS from "./mito-placement-data.js";
@@ -368,6 +369,7 @@ function buildNuclearER(group, detail, ctx, id) {
   envelope.geometry = continuum.geometry;
   envelope.material = [nuclearMaterial, erMaterial, neckMaterial, smoothERMaterial];
   envelope.userData.organelleByMaterial = { 0: "nucleus", 1: "er", 2: "er", 3: "er" };
+  envelope.userData.secretoryDomainByMaterial = { 0: "nuclear-envelope", 1: "rough-er", 2: "nuclear-er-connection", 3: "smooth-er" };
   envelope.userData.continuousPNSER = true;
   ctx.shell = ctx.shell.filter((o) => o !== envelope);
   ctx.explicitShellMaterials.add(nuclearMaterial);
@@ -377,9 +379,14 @@ function buildNuclearER(group, detail, ctx, id) {
     ctx.explicitShellMaterials.add(smoothERMaterial);
   }
   Object.assign(ctx.anchors, continuum.anchors);
+  // Aim at exposed rough ER, not through the near nuclear envelope.
+  ctx.anchors.roughER = V(1.662932, .081858, .299937);
+  ctx.anchors.roughERTarget = ctx.anchors.roughER.clone();
+  ctx.anchors.roughERCamera = ctx.anchors.roughER.clone().add(V(.21, .63, 2.03));
   ctx.anchors.inside.copy(continuum.anchors.pnsInterior);
   ctx.anchors.insideTarget.copy(continuum.anchors.pnsSightTarget);
   ctx.metadata = continuum.metadata;
+  ctx.metadata.secretoryDetails = erDetailDescriptors(true);
   ctx.stats = { ...ctx.stats, continuousNuclearER: true, smoothERTubularDomain: true, smoothERSharedPort: true, sharedNuclearPorts: 1, sharedIntercisternalNecks: 20, erCisternae: 11, continuumTriangles: continuum.geometry.index.count / 3 };
   ctx.sectionRadius = 1.5;
   if (id === "er") {
@@ -398,6 +405,7 @@ function buildNuclearER(group, detail, ctx, id) {
       scales.push(V(0.8 + random() * 0.4, 0.75 + random() * 0.3, 0.85 + random() * 0.3));
     }
     const ribosomes = beads(group, points, 0.024, physical("#ad80ad", { roughness: 0.55 }), { scales, segments: detail ? 24 : 6, name: "ContinuumERBoundRibosomes" });
+    ribosomes.userData.secretoryDomain = "rough-er";
     ctx.shell.push(ribosomes);
     bindToSection(ctx, ribosomes, surface);
   } else {
@@ -581,6 +589,7 @@ function buildER(group, detail, ctx) {
     ctx.stats.boundRibosomeEnvelope = applyBakedERPlacement(detail, ribo, surfaceAnchors, placementInput);
   }
   ribo.userData.shell = true;
+  ribo.userData.secretoryDomain = "rough-er";
   ctx.shell.push(ribo);
   bindToSection(ctx, ribo, surfaceAnchors);
   if (detail) {
@@ -603,6 +612,9 @@ function buildER(group, detail, ctx) {
   ctx.radius = 1.6;
   ctx.anchors.inside = folded.curve.getPoint(0.37).add(V(0, 6e-3, 0));
   ctx.anchors.insideTarget = folded.curve.getPoint(0.371);
+  ctx.anchors.roughER = V(-.594324, .415161, .559818);
+  ctx.anchors.roughERTarget = ctx.anchors.roughER.clone();
+  ctx.anchors.roughERCamera = ctx.anchors.roughER.clone().add(V(.21, .63, 2.03));
   ctx.facts = ["粗面内质网由相通的扁囊与管道组成，核糖体位于胞质侧。", "扁囊与管状连接共同围成内质网腔。", "相机进入的是内质网腔；蛋白折叠与分泌起始过程在此发生。"];
   ctx.stats.continuousLumen = true;
   ctx.stats.cisternae = folded.levels;
@@ -612,50 +624,94 @@ function buildER(group, detail, ctx) {
   const smoothER = attachSmoothERNetwork({ geometry: originalERGeometry, capCenterId: originalERGeometry.attributes.position.count - 1, scale: 0.8, materialIndex: 1 });
   folded.mesh.geometry = smoothER.geometry;
   folded.mesh.material = [material, continuousMembrane("#95b8b0", { roughness: 0.49, clearcoat: 0.2 })];
+  folded.mesh.userData.secretoryDomainByMaterial = { 0: "rough-er", 1: "smooth-er" };
   originalERGeometry.dispose();
   ctx.anchors.smoothER = V().fromArray(smoothER.metadata.smoothAnchor);
   ctx.anchors.smoothERCamera = V().fromArray(smoothER.metadata.smoothCamera);
   ctx.anchors.smoothERTarget = V().fromArray(smoothER.metadata.smoothTarget);
-  ctx.metadata = { ...ctx.metadata, smoothER: smoothER.metadata };
+  ctx.metadata = { ...ctx.metadata, smoothER: smoothER.metadata, secretoryDetails: erDetailDescriptors(false) };
   ctx.stats.smoothERTubularDomain = true;
   ctx.stats.smoothERSharedPort = true;
   ctx.radius = 2;
   ctx.facts = ["粗面域以扁囊为主，胞质侧附着核糖体；平滑域是无附着核糖体的分支管网。", "两域经同一组边界顶点连续，内部为共同的 ER 腔；不是两个彼此贴近的器官。", "管网、片层比例和颜色用于展示；脂质代谢及钙调控仅作功能说明，未展示专门酶或钙浓度场。"];
 }
+function erDetailDescriptors(connected) {
+  return [
+    { id: "rough-er", title: "粗面内质网 · RER", anchor: "roughER", camera: "roughERCamera", target: "roughERTarget", section: 0, guideFeatureId: "rough-er" },
+    { id: "smooth-er", title: "光面内质网 · SER", anchor: "smoothER", camera: "smoothERCamera", target: "smoothERTarget", section: 0, guideFeatureId: "smooth-er" },
+    { id: "er-lumen", title: connected ? "核周隙—ER 连续腔" : "进入 ER 水性腔", camera: "inside", target: "insideTarget", section: .73, inside: true, guideFeatureId: connected ? "nuclear-er-connection" : "er-lumen" }
+  ];
+}
 function buildGolgi(group, detail, ctx) {
-  const map = relief(17), stack = detail ? 8 : 6, random = rng(717);
-  ctx.textures.add(map);
+  const stack = 7, random = rng(717), levels = [], palettes = ["#dea8a0", "#df9d96", "#d78a83"];
+  const zoneNames = ["cis", "cis", "medial", "medial", "medial", "trans", "trans"];
   for (let k = 0; k < stack; k++) {
-    const width = 1.18 - Math.abs(k - (stack - 1) * 0.47) * 0.055, depth = 0.69 + 0.04 * Math.sin(k), g = cisterna(width, depth, detail ? 0.033 : 0.042, -0.8 + k * 0.208, k * 0.81, detail), m = new THREE.Mesh(g, physical(new THREE.Color("#e4a197").lerp(new THREE.Color("#e8b4a4"), k / stack), { bumpMap: map, bumpScale: 9e-3, roughness: 0.34, clearcoat: 0.48 }));
+    const level = -.73 + k * .205, width = 1.18 - Math.abs(k - 3) * .055, depth = .69 + .04 * Math.sin(k), phase = k * .81, zone = zoneNames[k];
+    const g = cisterna(width, depth, detail ? .033 : .042, level, phase, detail);
+    const color = palettes[zone === "cis" ? 0 : zone === "medial" ? 1 : 2];
+    const m = new THREE.Mesh(g, continuousMembrane(color, { roughness: .43, clearcoat: .25 }));
     m.name = `GolgiClosedFlattenedCisterna${k + 1}`;
     m.rotation.y = (k - 3) * 0.025;
     m.userData.shell = true;
+    m.userData.secretoryDomain = zone;
+    levels.push({ index: k, zone, level, width, depth });
     group.add(m);
     ctx.shell.push(m);
     if (detail) {
       const dots = [];
-      for (let j = 0; j < 140; j++) {
+      for (let j = 0; j < 95; j++) {
         const a = random() * TAU, r = Math.sqrt(random()) * 0.83;
-        dots.push(V(Math.cos(a) * r * width, -0.8 + k * 0.208 + 0.23 * r * r, Math.sin(a) * r * depth));
+        const rim = 1 + .047 * Math.sin(a * 5 + phase) + .023 * Math.sin(a * 9 - phase);
+        const x = Math.cos(a) * r * width * rim, z = Math.sin(a) * r * depth * rim;
+        const y = level + .23 * r * r + .035 * Math.sin(a * 3 + phase) * r * r + .018 * noise(x, ySafe(level), z) * r;
+        dots.push(V(x, y, z));
       }
-      beads(group, dots, 9e-3, physical("#d9b97d", { roughness: 0.65 }), { segments: 24, name: "GolgiLumenCargo" });
+      const cargo = beads(group, dots, .009, physical("#d9b97d", { roughness: .65 }), { segments: 12, name: "GolgiLumenCargo" });
+      cargo.rotation.y = m.rotation.y;
+      cargo.userData.secretoryDomain = zone;
+      ctx.shell.push(cargo);
     }
   }
+  const network = createTransGolgiNetwork({ detail });
+  const tgn = new THREE.Mesh(network.geometry, continuousMembrane("#ce837d", { roughness: .44, clearcoat: .24 }));
+  tgn.name = "GolgiTransTubulocisternalNetwork";
+  tgn.userData = { shell: true, secretoryDomain: "tgn", continuousLumen: true };
+  group.add(tgn);
+  ctx.shell.push(tgn);
   for (let i = 0; i < (detail ? 28 : 12); i++) {
     const k = i % stack, a = i * 2.399 + 0.13, pos = V(Math.cos(a) * (1.18 + random() * 0.32), -0.75 + k * 0.21 + random() * 0.08, Math.sin(a) * (0.77 + random() * 0.24)), r = 0.07 + random() * 0.07;
     const m = sphere(group, organicSphere(r, detail ? 24 : 12, 0.035, i), physical(i % 2 ? "#dfa2a0" : "#efb5a7", { roughness: 0.31 }), pos);
     m.name="GolgiTransportVesicleMembrane";
     m.userData.shell = true;
+    m.userData.secretoryDomain = "carriers";
     ctx.shell.push(m);
     if (detail) {
       sphere(group, organicSphere(r * 0.67, 16, 0.04, i), physical("#d4ae78", { roughness: 0.65 }), pos).name="GolgiTransportVesicleCargo";
     }
   }
-  ctx.radius = 1.7;
-  ctx.anchors.inside = V(0.25, 0.04, 0.2);
-  ctx.anchors.insideTarget = V(-0.4, 0.06, 0.1);
-  ctx.facts = ["高尔基体由有极性的扁平膜囊堆叠而成。", "相邻膜囊的腔室彼此分隔；囊泡参与膜与货物的运输。", "展示薄囊腔、弯曲边缘、出芽及内部货物，而不是将各层连成同一个空腔。"];
+  ctx.radius = 1.8;
+  // The centre of cisterna 4 is inside its lumen, rather than in the
+  // cytosolic gap between two cisternae. This also leaves room to orbit.
+  ctx.anchors.inside = V(0, levels[3].level, 0);
+  ctx.anchors.insideTarget = V(-.20, levels[3].level + .008, -.07);
+  const domains = [
+    ["golgiCis", "cis", "顺面 · cis", V(-.52, levels[1].level + .12, .37), V(.65, -1.35, 2.1)],
+    ["golgiMedial", "medial", "中间囊 · medial", V(-.32, levels[3].level + .08, .43), V(1.4, .55, 2.15)],
+    ["golgiTrans", "trans", "反面 · trans", V(.30, levels[6].level + .09, .37), V(1.15, 1.65, 1.95)],
+    ["golgiTGN", "tgn", "反面管网 · TGN", V(.42, .97, -.12), V(.9, 2.15, 1.5)]
+  ];
+  const secretoryDetails = domains.map(([key, id, title, target, camera]) => {
+    ctx.anchors[key] = target;
+    ctx.anchors[key + "Target"] = target.clone();
+    ctx.anchors[key + "Camera"] = camera;
+    return { id, title, anchor: key, camera: key + "Camera", target: key + "Target", section: 0, guideFeatureId: "golgi-" + id };
+  });
+  secretoryDetails.push({ id: "golgi-lumen", title: "进入中间囊腔", camera: "inside", target: "insideTarget", section: .73, inside: true, guideFeatureId: "golgi-lumen" });
+  ctx.metadata = { ...ctx.metadata, secretoryDetails, golgi: { zones: levels, tgn: network.metadata, measuredSegmentation: false } };
+  ctx.facts = ["顺面接收来自 ER—ERGIC 途径的货物，中间囊与反面承担连续加工步骤。", "反面管网 TGN 是独立显示的分支管囊区；其囊与管连续，相邻堆叠囊腔没有被错误合并。", "七层及颜色只作区域定位：真实囊数、酶分布和囊间连接会随细胞类型与状态变化。"];
   ctx.stats.cisternae = stack;
+  ctx.stats.golgiZones = ["cis", "medial", "trans", "tgn"];
+  ctx.stats.continuousTGN = true;
 }
 const decodedMitoPlacements = /* @__PURE__ */ new Map();
 function mitoPlacementInput(core, innerMesh) {

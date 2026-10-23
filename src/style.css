@@ -1099,3 +1099,24 @@ body {
 .network-layer-toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:#42566f;padding:8px 0}.network-layer-toggle input{accent-color:#e99c26}
 .surface-activity-actions .micro-button{width:auto;flex:1 1 auto}#surface-activity-status{font-family:inherit;font-size:11px;line-height:1.5;color:#6c7d91}.skeleton-focus-mode .masthead{background:#f8f9fce8;border-radius:13px;padding:10px 14px;left:22px;top:17px;backdrop-filter:blur(9px)}
 .uptake-case-selector{grid-template-columns:repeat(3,minmax(0,1fr))}.uptake-case-selector button{padding:9px 5px}.uptake-case-selector strong{font-size:11px}.uptake-case-selector span{font-size:9px}
+/* Structure-specific observation controls remain in the scrolling sidebar. */
+.structure-focus-panel,.fusion-controls,.fusion-entry-panel{margin:16px 0;padding:16px;border:1px solid #d9e2e9;border-radius:18px;background:linear-gradient(145deg,#fff9,#eef5f8b3)}
+.structure-focus-panel h3,.fusion-entry-panel h3{font-size:14px;margin:0 0 12px;color:#263c50;letter-spacing:.02em}
+.structure-focus-buttons,.fusion-stages{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.structure-focus-buttons button,.fusion-stages button{border:1px solid #d8e1e8;border-radius:10px;background:#ffffffb8;color:#395368;padding:9px 8px;font:inherit;font-size:12px;line-height:1.5;text-align:left;cursor:pointer}
+.structure-focus-buttons button[aria-pressed="true"],.fusion-stages button[aria-pressed="true"]{background:#dcebf0;border-color:#7eafbf;color:#183e50;box-shadow:inset 3px 0 #468da6}
+.structure-focus-description,.fusion-stage-description,.fusion-entry-panel p{font-size:12px;line-height:1.8;color:#4d6576;margin:12px 0 0}
+.fusion-controls label{display:flex;justify-content:space-between;font-size:12px;color:#395368;margin-top:16px}
+.fusion-controls input[type="range"]{width:100%;accent-color:#d3944e;margin:12px 0}
+.fusion-topology-note{font-size:11px;line-height:1.7;color:#71808b;margin-bottom:0}
+.fusion-entry-panel .micro-button{margin:6px 0}
+.bilayer-legend{display:flex;flex-wrap:wrap;gap:7px 12px;margin:14px 0;color:#4b6274;font-size:11px;line-height:1.6}
+.bilayer-legend span{display:flex;align-items:center;gap:5px}
+.bilayer-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
+.leaflet-out{background:#76b4cc}.leaflet-in{background:#d49aaf}.leaflet-tail{background:#bd924d}
+.bilayer-legend p{margin:0;font-size:11px;color:#71808b}
+.feature-location{font-size:11px;color:#778894;line-height:1.6;margin:5px 0 0}
+.cytoplasm-motion-control{display:flex;align-items:center;gap:8px;color:#557080;font-size:12px;line-height:1.5;margin:14px 0}
+.fusion-compartments{position:absolute;top:105px;left:36px;z-index:3;display:flex;flex-direction:column;gap:5px;pointer-events:none;padding:13px 17px;border:1px solid #d8e1e9;border-radius:14px;background:#fffffff0;box-shadow:0 6px 24px #183d5010;font-size:12px;line-height:1.55;color:#3d586d;max-width:290px}
+.fusion-compartments[hidden]{display:none}.fusion-compartments strong{font-size:13px;color:#1d384d;margin-bottom:2px}.fusion-compartments small{font-size:11px;color:#728390}
+@media(max-width:900px){.fusion-compartments{left:14px;top:90px;max-width:220px;font-size:10px;padding:8px}}

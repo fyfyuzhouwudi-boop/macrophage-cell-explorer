@@ -109,220 +109,425 @@ const STRUCTURE_GUIDE ={
     "note": "透明与剖切用于看清区室；核与 ER 连接视图采用同一连续膜网。可见亚结构是本入口的组成部分，不是额外点击入口。"
   },
   "er": {
-    "title": "内质网",
-    "function": "粗面内质网接收分泌途径及膜蛋白的新生链，进行折叠和早期加工；ER 也参与脂质代谢与钙储存。",
-    "location": "胞质内展开的膜性囊与网络；外核膜及核周隙分别延续到 ER 膜及 ER 腔。",
+    "title": "内质网 · 粗面与光面",
+    "function": "内质网是连续的膜—腔系统：粗面域的胞质侧附着核糖体，参与分泌及膜蛋白的合成与加工；光面域不附着核糖体，形成分支管网，并参与脂质代谢与钙稳态。",
+    "location": "位于胞质中；外核膜延续为 ER 膜，核周隙延续为 ER 腔。ER 腔、胞质、核质是不同区室。",
     "partners": [
-      "核膜：膜与腔的连续",
-      "附着核糖体：在膜的胞质侧翻译",
-      "高尔基体：接收后续加工与分选的货物"
+      "外核膜与核周隙：膜、腔分别连续",
+      "胞质侧核糖体：新生肽经转位装置进入 ER 或插入其膜",
+      "ERGIC 与高尔基体：通过运输载体交换，彼此没有常开水管"
     ],
     "features": [
       {
-        "name": "折叠膜囊与共同腔",
-        "function": "围出独立于胞质的 ER 腔，为蛋白质折叠与加工提供环境。",
+        "id": "rough-er",
+        "name": "粗面内质网 · 膜片层与核糖体",
+        "function": "较扁的膜囊为膜结合核糖体提供表面。粉紫色核糖体附在胞质侧；囊内是 ER 水性腔。",
         "visible": true,
         "views": [
           "ordinary",
           "connection"
         ],
-        "location": "囊膜内为 ER 腔，膜外为胞质；连接模式延伸至核周隙。",
+        "location": "蓝色膜片层外侧；核糖体不位于腔内。",
         "partners": [
-          "附着核糖体与腔内折叠系统",
-          "高尔基体运输途径"
-        ],
-        "parts": [
-          "er"
-        ]
-      },
-      {
-        "name": "胞质侧附着核糖体",
-        "function": "翻译进入 ER 分泌途径的新生蛋白；核糖体主体在膜外胞质侧。",
-        "visible": true,
-        "views": [
-          "ordinary",
-          "connection"
-        ],
-        "location": "ER膜胞质侧，不在腔内。",
-        "partners": [
-          "mRNA、tRNA 与翻译因子",
-          "ER 跨膜转运装置（未独立建模）"
+          "核糖体与 Sec61 转位复合体",
+          "腔内折叠与早期修饰系统"
         ],
         "parts": [
           "er",
           "ribosome"
+        ],
+        "note": "粗面与光面是同一网络的区域特征，真实边界可随状态变化；不能仅用一段管子的形状判定其是否粗面。",
+        "focus": "rough-er",
+        "sources": [
+          {
+            "title": "Shibata 等（2010）｜ER 片层与管状域的形成机制",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/21111237/"
+          },
+          {
+            "title": "Voorhees 等（2014）｜核糖体—Sec61 冷冻电镜结构",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4081569/"
+          }
         ]
       },
       {
-        "name": "核周隙—ER 腔连接",
-        "function": "显示外核膜延续及腔内连续；不是核质向 ER 开洞。",
+        "id": "smooth-er",
+        "name": "光面内质网 · 分支管网",
+        "function": "分支管道没有附着核糖体，连续围成与粗面域相通的 ER 腔；真实管网的形状由膜曲率相关蛋白及融合活动共同维持。",
+        "visible": true,
+        "views": [
+          "ordinary",
+          "connection"
+        ],
+        "location": "浅绿色管网，与蓝色粗面域经同一开口相连。",
+        "partners": [
+          "粗面域的连续膜与腔",
+          "脂质代谢及钙调节相关蛋白"
+        ],
+        "parts": [
+          "er"
+        ],
+        "note": "本模型保留共享网格接口、三向分支和环路；没有把两片相碰的封闭膜当作贯通。形状比例为教学设计。",
+        "focus": "smooth-er",
+        "sources": [
+          {
+            "title": "Shibata 等（2010）｜ER 片层与管状域的形成机制",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/21111237/"
+          }
+        ]
+      },
+      {
+        "id": "er-lumen",
+        "name": "ER 腔 · 膜内水相",
+        "function": "为分泌蛋白折叠、二硫键形成与早期加工提供环境；剖面中的金色货物和绿色组团表示腔内成分。",
+        "visible": true,
+        "views": [
+          "ordinary"
+        ],
+        "location": "膜囊及管道的内部；与外侧胞质隔开。",
+        "partners": [
+          "新生肽链",
+          "腔内伴侣与加工酶"
+        ],
+        "parts": [
+          "er"
+        ],
+        "note": "形体不指认特定蛋白的原子结构。进入视图的相机位于 ER 腔，不在脂质双层的疏水核心中。",
+        "focus": "er-lumen",
+        "sources": [
+          {
+            "title": "Alberts 等｜The Endoplasmic Reticulum",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26841/"
+          }
+        ]
+      },
+      {
+        "id": "nuclear-er-connection",
+        "name": "核周隙—ER 腔连续连接",
+        "function": "外核膜与 ER 膜连续，二者围出的核周隙与 ER 腔也连续。核内膜维持核质的边界。",
         "visible": true,
         "views": [
           "connection"
         ],
-        "location": "外核膜延伸至 ER 膜的接头内侧；连通核周隙和 ER 腔。",
+        "location": "核外膜向粗面 ER 延伸的膜颈。",
         "partners": [
-          "外核膜与 ER 膜",
-          "核周隙与 ER 腔；核质不属于这条通路"
+          "外核膜",
+          "核周隙与 ER 腔"
         ],
         "parts": [
           "er",
           "nucleus"
+        ],
+        "note": "核孔连接核质与胞质；核孔不是 ER 腔的入口。模型连接颈及层数不是某一巨噬细胞的实测电镜分割。",
+        "focus": "er-lumen",
+        "sources": [
+          {
+            "title": "Terasaki 等（2013）｜连续 ER 片层的三维电镜重建",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3767119/"
+          },
+          {
+            "title": "Alberts 等｜The Endoplasmic Reticulum",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26841/"
+          }
         ]
       },
       {
-        "name": "腔内蛋白颗粒",
-        "function": "示意新生蛋白及折叠相关内容物。",
-        "visible": true,
-        "note": "通用形体，不指认某一种伴侣蛋白的原子结构。",
-        "views": [
-          "ordinary"
-        ],
-        "location": "普通ER水腔内。",
-        "partners": [
-          "腔内折叠系统（以通用形体表示）",
-          "后续送往高尔基体的运输载体"
-        ],
-        "parts": [
-          "er"
-        ]
-      },
-      {
-        "name": "平滑内质网管网域",
-        "function": "无附着核糖体的 ER 管网与粗面域共用连续膜腔；这类区域可参与脂质代谢与钙调控。",
-        "visible": true,
-        "note": "已建出相连的分支管网和共同腔；未逐一建立脂质代谢酶、钙泵或浓度场。",
+        "id": "sec61",
+        "name": "核糖体—Sec61 与膜蛋白插入",
+        "function": "翻译中的核糖体将新生肽交给膜内 Sec61；可溶性分泌蛋白进入腔侧，跨膜区可从侧向开口进入脂质双层。",
+        "visible": false,
         "views": [
           "ordinary",
           "connection"
         ],
-        "location": "与粗面片层相连的无核糖体管网域；同属内质网。",
+        "location": "粗面 ER 膜的胞质侧及贯膜转位通道。",
+        "partners": [
+          "核糖体",
+          "Sec61",
+          "新生多肽"
+        ],
+        "note": "当前附着颗粒表示核糖体位置，Sec61 原子通道及完整翻译循环未在这个 ER 视图中单独重建。",
+        "sources": [
+          {
+            "title": "Voorhees 等（2014）｜核糖体—Sec61 冷冻电镜结构",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4081569/"
+          }
+        ]
+      },
+      {
+        "id": "er-exit",
+        "name": "ER 出口与 ERGIC",
+        "function": "合格货物从 ER 出口装入运输载体，经 ERGIC 向高尔基体顺面递送；回收运输帮助保留 ER 常驻成分。",
+        "visible": false,
+        "views": [
+          "ordinary",
+          "connection"
+        ],
+        "location": "专门的 ER 出口区域与相邻胞质。",
+        "partners": [
+          "COPII 相关出芽系统",
+          "ERGIC",
+          "Golgi 顺面"
+        ],
+        "note": "本视图没有逐个建立出口位点、包被、货物选择与解包被过程。",
+        "sources": [
+          {
+            "title": "Alberts 等｜Transport from the ER through the Golgi Apparatus",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
+        ]
+      },
+      {
+        "id": "er-calcium",
+        "name": "脂质代谢与钙储存",
+        "function": "ER 膜中的酶、泵和通道参与脂质合成及钙稳态；ER 腔中的钙结合成分也参与储存。",
+        "visible": false,
+        "views": [
+          "ordinary",
+          "connection"
+        ],
+        "location": "ER 膜及其腔侧、胞质侧。",
         "partners": [
           "脂质代谢酶",
-          "其他 ER 区域"
-        ]
-      },
-      {
-        "name": "钙泵与钙释放通道",
-        "function": "调节 ER 与胞质间的钙储存和信号。",
-        "visible": false,
-        "note": "功能背景，未建出相应分子装置或离子浓度场。",
-        "views": [
-          "ordinary",
-          "connection"
+          "钙泵与释放通道"
         ],
-        "location": "ER 膜及其两侧的胞质、ER 腔；本模型未建立专门装置。",
-        "partners": [
-          "钙结合蛋白",
-          "胞质信号网络"
+        "note": "模型没有给出实际离子浓度、特定代谢速率或药物反应。",
+        "sources": [
+          {
+            "title": "Alberts 等｜The Endoplasmic Reticulum",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26841/"
+          }
         ]
       }
     ],
     "sources": [
       {
+        "title": "Shibata 等（2010）｜ER 片层与管状域的形成机制",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/21111237/"
+      },
+      {
+        "title": "Terasaki 等（2013）｜连续 ER 片层的三维电镜重建",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3767119/"
+      },
+      {
+        "title": "Voorhees 等（2014）｜核糖体—Sec61 冷冻电镜结构",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4081569/"
+      },
+      {
         "title": "Alberts 等｜The Endoplasmic Reticulum",
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK26841/"
-      },
-      {
-        "title": "Cooper｜The Endoplasmic Reticulum",
-        "url": "https://www.ncbi.nlm.nih.gov/books/NBK9889/"
-      },
-      {
-        "title": "Cooper｜Glossary：outer nuclear membrane continuity",
-        "url": "https://www.ncbi.nlm.nih.gov/books/NBK9926/"
       }
     ],
-    "note": "膜囊数量、连接颈布局及厚度服务于展示，不是某个巨噬细胞的电镜分割。腔内颗粒运动不代表细胞发生宏观液流。"
+    "note": "连续拓扑和膜两侧朝向依据细胞生物学及电镜研究；外形是程序化教学构象，未使用某一个巨噬细胞的实测分割。腔内或胞质中的轻微粒子运动不表示固定的宏观环流。"
   },
   "golgi": {
-    "title": "高尔基体",
-    "function": "进一步修饰 ER 运来的蛋白质与脂质，并把货物分选到细胞表面、分泌或内体—溶酶体途径。",
-    "location": "胞质中的扁平膜囊堆叠；与 ER 相邻但不是同一共同腔。",
+    "title": "高尔基体 · cis—medial—trans—TGN",
+    "function": "接收 ER 运来的蛋白质及脂质，进行进一步修饰，并在反面管网 TGN 分选到细胞表面或内体等目的地。",
+    "location": "胞质内的有极性膜囊堆叠。顺面为接收侧，反面及 TGN 为主要分选侧；各区域的膜腔与胞质隔开。",
     "partners": [
-      "内质网：递送与回收货物",
-      "运输载体：连接不同区室",
-      "内体与细胞膜：接收分选货物"
+      "ER—ERGIC：递送及回收",
+      "顺面、中间囊、反面：依次变化的加工环境",
+      "TGN 与运输载体：分选到表面、分泌和内体途径"
     ],
     "features": [
       {
-        "name": "分层扁平囊与囊腔",
-        "function": "提供分区的加工环境；图中各囊腔彼此分开。",
+        "id": "golgi-cis",
+        "name": "顺面 · cis 接收侧",
+        "function": "接收经 ERGIC 运来的分泌途径货物，并参与早期 Golgi 加工及回收。",
         "visible": true,
         "views": [
           "ordinary"
         ],
-        "location": "胞质内层叠的扁平膜囊；本模型各囊腔分开。",
+        "location": "堆叠较下方的两层浅珊瑚色膜囊；颜色仅用于定位。",
         "partners": [
-          "ER 运来的货物",
-          "分选与回收载体"
+          "ERGIC",
+          "中间囊",
+          "返回 ER 的载体"
         ],
         "parts": [
           "golgi"
+        ],
+        "focus": "cis",
+        "note": "电镜所见顺面附近的 ERGIC 元件可彼此分开，不能画成一根把 ER 与整个 Golgi 常开连通的水管。",
+        "sources": [
+          {
+            "title": "Ladinsky 等（1999）｜哺乳动物 Golgi 双轴电镜断层重建",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2150572/"
+          },
+          {
+            "title": "Alberts 等｜Transport from the ER through the Golgi Apparatus",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
         ]
       },
       {
-        "name": "囊腔内货物",
-        "function": "示意正在加工、将被分选的内容物。",
+        "id": "golgi-medial",
+        "name": "中间囊 · medial 加工区",
+        "function": "货物在不同加工环境中经历糖链等修饰。区域身份由驻留成分等决定，不只由几何层数决定。",
         "visible": true,
         "views": [
           "ordinary"
         ],
-        "location": "扁囊腔内。",
+        "location": "堆叠中部三层膜囊。",
         "partners": [
-          "高尔基加工酶（未逐种建模）",
-          "后续运输载体"
+          "顺面及反面",
+          "常驻加工酶",
+          "囊泡与管状回收途径"
         ],
         "parts": [
           "golgi"
+        ],
+        "focus": "medial",
+        "note": "层数、颜色及酶分布不用于表达每个巨噬细胞的固定配置；本模型没有逐种建立加工酶。",
+        "sources": [
+          {
+            "title": "Alberts 等｜Transport from the ER through the Golgi Apparatus",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
         ]
       },
       {
-        "name": "周围运输泡",
-        "function": "示意货物在高尔基体与其他区室间转运的载体。",
+        "id": "golgi-trans",
+        "name": "反面 · trans 输出侧",
+        "function": "承担较晚加工并与反面分选区相接。电镜显示多层反面膜囊都可能具有管状延伸。",
         "visible": true,
         "views": [
           "ordinary"
         ],
-        "location": "Golgi周围，各有自身腔。",
+        "location": "较上方两层深珊瑚色膜囊，邻近 TGN。",
         "partners": [
-          "高尔基体与 ER",
-          "细胞表面和内体途径"
+          "中间囊",
+          "TGN",
+          "返回较早区室的载体"
+        ],
+        "parts": [
+          "golgi"
+        ],
+        "focus": "trans",
+        "note": "真实 Golgi 囊间连接随状态而变；教学模型把堆叠囊腔分开，没有把所有高尔基囊永不连接作为生物学结论。",
+        "sources": [
+          {
+            "title": "Ladinsky 等（1999）｜哺乳动物 Golgi 双轴电镜断层重建",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2150572/"
+          }
+        ]
+      },
+      {
+        "id": "golgi-tgn",
+        "name": "TGN · 反面管囊分选区",
+        "function": "分支管囊结构参与货物分选并形成输出载体。模型中扁囊、连接颈、分支及环路围成同一个连续腔。",
+        "visible": true,
+        "views": [
+          "ordinary"
+        ],
+        "location": "堆叠上方的深珊瑚色管囊网络。",
+        "partners": [
+          "反面货物",
+          "通往细胞表面和内体的载体",
+          "分选受体及包被相关系统"
+        ],
+        "parts": [
+          "golgi"
+        ],
+        "focus": "tgn",
+        "note": "所示单个网络是电镜形态约束下的教学代表；未重建全部分支、囊间连接或真实出芽装置。",
+        "sources": [
+          {
+            "title": "Ladinsky 等（1994）｜TGN 管网与出芽的三维电镜",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2120188/"
+          },
+          {
+            "title": "Ladinsky 等（1999）｜哺乳动物 Golgi 双轴电镜断层重建",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2150572/"
+          }
+        ]
+      },
+      {
+        "id": "golgi-lumen",
+        "name": "膜囊腔 · 膜内货物",
+        "function": "每个扁囊的膜把腔内货物与胞质隔开。进入按钮定位到中间囊的水性腔，剖切可看见薄囊内部。",
+        "visible": true,
+        "views": [
+          "ordinary"
+        ],
+        "location": "扁囊两侧膜面之间；不是两个相邻囊之间的胞质间隙。",
+        "partners": [
+          "腔内货物",
+          "膜及腔内加工成分"
+        ],
+        "parts": [
+          "golgi"
+        ],
+        "focus": "golgi-lumen",
+        "sources": [
+          {
+            "title": "Alberts 等｜Transport from the ER through the Golgi Apparatus",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
+        ]
+      },
+      {
+        "id": "golgi-carriers",
+        "name": "周围运输载体",
+        "function": "独立的小泡表示 Golgi 与其他区室间的膜及货物运输；不同真实载体具有不同分选及融合成分。",
+        "visible": true,
+        "views": [
+          "ordinary"
+        ],
+        "location": "堆叠周围，每个载体有自身膜和腔。",
+        "partners": [
+          "高尔基体",
+          "ER、细胞表面及内体"
         ],
         "parts": [
           "golgi",
           "transport-vesicles"
+        ],
+        "note": "载体不是从一层囊腔直接穿过多层膜的颗粒；本局部不把静态位置称为实测运输轨迹。",
+        "sources": [
+          {
+            "title": "Ladinsky 等（1999）｜哺乳动物 Golgi 双轴电镜断层重建",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2150572/"
+          }
         ]
       },
       {
-        "name": "包被与 SNARE 装置",
-        "function": "参与载体形成、识别和膜融合。",
+        "id": "golgi-maturation",
+        "name": "囊成熟与逆向回收",
+        "function": "囊成熟及多种膜运输共同维持 Golgi 的极性；常驻成分可回收到较早区室。",
         "visible": false,
-        "note": "背景机制；未建出 COP、网格蛋白或 SNARE 的专门分子结构。",
         "views": [
           "ordinary"
         ],
-        "location": "相应载体和靶膜的胞质侧；背景机制，当前没有分子模型。",
+        "location": "顺面至反面的动态膜系统。",
         "partners": [
-          "货物与分选受体",
-          "供体膜和靶膜"
+          "驻留酶",
+          "运输载体",
+          "系留及 SNARE 融合装置"
+        ],
+        "note": "本局部显示空间结构，未把同一个静态囊的换色冒充完整囊成熟实验。",
+        "sources": [
+          {
+            "title": "Alberts 等｜Transport from the ER through the Golgi Apparatus",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
         ]
       }
     ],
     "sources": [
       {
+        "title": "Ladinsky 等（1999）｜哺乳动物 Golgi 双轴电镜断层重建",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2150572/"
+      },
+      {
+        "title": "Ladinsky 等（1994）｜TGN 管网与出芽的三维电镜",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2120188/"
+      },
+      {
         "title": "Alberts 等｜Transport from the ER through the Golgi Apparatus",
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
-      },
-      {
-        "title": "Cooper｜The Golgi Apparatus",
-        "url": "https://www.ncbi.nlm.nih.gov/books/NBK9838/"
-      },
-      {
-        "title": "Cooper｜The Mechanism of Vesicular Transport",
-        "url": "https://www.ncbi.nlm.nih.gov/books/NBK9886/"
       }
     ],
-    "note": "层叠外形与运输泡是教学示意；没有逐一标定每层的酶组成，也没有演示所有囊成熟或回收步骤。"
+    "note": "取材于哺乳动物 Golgi 的电镜断层研究；参考研究包含大鼠肾细胞，不能作为此巨噬细胞的原位测量。七层膜囊、独立 TGN 网络及色彩是便于观察的教学设计。"
   },
   "mitochondria": {
     "title": "线粒体",
