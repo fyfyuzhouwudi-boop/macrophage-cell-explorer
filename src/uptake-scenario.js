@@ -37,7 +37,7 @@ const clamp=x=>THREE.MathUtils.clamp(Number(x)||0,0,1);
 const smooth=x=>{x=clamp(x);return x*x*(3-2*x);};
 const V=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 const Z=V(0,0,1);
-function material(color,roughness=.4,extra={}) {return new THREE.MeshPhysicalMaterial({color,roughness,metalness:0,clearcoat:.28,clearcoatRoughness:.28,side:THREE.DoubleSide,...extra});}
+function material(color,roughness=.4,extra={}) {return new THREE.MeshPhysicalMaterial({color,roughness,metalness:0,clearcoat:.04,clearcoatRoughness:.7,side:THREE.DoubleSide,...extra});}
 function tubeBetween(a,b,r,sides=6) {
   const d=b.clone().sub(a),g=new THREE.CylinderGeometry(r,r,d.length(),sides,1,false);
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0,1,0),d.normalize()));
@@ -59,8 +59,10 @@ function glyph(type,high) {
     for(let i=0;i<3;i++)put(ellipsoid(-.03+.025*Math.sin(i*1.8),0,-.09-i*.042,.044,.029,.032,n),'ectodomain');
   }else{
     put(tubeBetween(V(0,0,-.055),V(0,0,-.115),.012,high?8:5),'ectodomain');
-    put(ellipsoid(-.028,0,-.115,.034,.032,.04,n),'ectodomain');
-    put(ellipsoid(.028,0,-.135,.034,.032,.04,n),'ectodomain');
+    // Two extracellular Ig-like domains. The stalk crosses the bilayer and
+    // the shorter signalling tail remains on its cytoplasmic side.
+    put(ellipsoid(-.012,0,-.09,.032,.029,.037,n),'ectodomain');
+    put(ellipsoid(.012,0,-.144,.035,.03,.037,n),'ectodomain');
   }
   const g=merge(p);g.userData.teachingSymbol=type;return g;
 }
@@ -168,7 +170,8 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
   function ownGeo(g){geometrySet.add(g);return g;}
   function ownMat(m){materialSet.add(m);matBase.set(m,{opacity:m.opacity,transparent:m.transparent,depthWrite:m.depthWrite});return m;}
   function m(color,r=.4,extra={}){return ownMat(material(color,r,extra));}
-  const aMem=m('#9cbec2',.32,{transmission:.16,thickness:.045}),aCargo=m('#b5a18b',.65),iggMat=m('#ecd69d',.43),fcMat=m('#9b78a4',.4),actinMat=m('#d4a453',.47),enzymeMat=m('#8faaa0',.48);
+  const aMem=m('#789b9e',.64,{transmission:0,thickness:.036,vertexColors:true}),aCargo=m('#a68162',.82),iggMat=m('#f4ce72',.57),fcMat=m('#765191',.61),actinMat=m('#cb944b',.68),enzymeMat=m('#358778',.62);
+  const pumpMat=m('#536e9b',.62),protonMat=m('#d35681',.58),cleftMat=m('#eb9970',.69),peptideMat=m('#d6a479',.76),lipidMat=m('#a1bdba',.76);
   const bMem=m('#92b7c2',.32,{transmission:.13,thickness:.045}),mrMat=m('#ab79a4',.39),ligandMat=m('#e3ad63',.45),recycleMat=m('#97b9c3',.34,{transmission:.12,thickness:.045}),processMat=m('#b8a1c5',.35,{transmission:.12,thickness:.045});
   function mesh(g,mat,parent,name,role,keys,cid,identity=null){
     const o=new THREE.Mesh(ownGeo(g),mat);o.name=name;o.userData={owner:'uptake-scenario',caseId:cid,role,identity,componentKey:role};parent.add(o);bindings.push({object:o,role,dependencies:keys});return o;
@@ -184,15 +187,48 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
   const closed=mesh(route.vesicleGeometry,aMem,aRoot,'UptakeClosedPhagosomeWall','a-closed',['phagosome'],A);
   const mother=mesh(route.motherGeometry,aMem,aRoot,'UptakeSealedMotherMembrane','a-mother',['membrane'],A);
   cup.userData.topologyRole='one-connected-membrane-cup-neck-background';mother.userData.boundaryRole='finite-patch-artificial-perimeter-not-cell-boundary';
-  const cargoGeometry=ownGeo(new THREE.SphereGeometry(.77,detail?32:20,detail?20:12));
-  const ca=cargoGeometry.getAttribute('position');for(let i=0;i<ca.count;i++){const v=V(ca.getX(i),ca.getY(i),ca.getZ(i)),n=v.clone().normalize(),r=1+.052*Math.sin(n.x*9+n.z*4)*Math.cos(n.y*8)+.023*Math.sin(n.z*15+n.x*3);v.multiplyScalar(r);ca.setXYZ(i,v.x,v.y,v.z);}cargoGeometry.computeVertexNormals();cargoGeometry.computeBoundingSphere();
+  // Contrasting interfaces make the finite cut edge legible. These are the
+  // two sides of ONE bilayer, not a pair of concentric biological membranes.
+  for(const g of [route.preGeometry,route.vesicleGeometry,route.motherGeometry]){
+    const colors=new Float32Array(g.attributes.position.count*3),c=new THREE.Color();
+    for(const range of g.userData.boundaryRanges){c.set(range.layer===0?'#92b3b2':'#d0ddcf');for(let i=range.startVertex;i<range.endVertex;i++)c.toArray(colors,i*3);}
+    g.setAttribute('color',new THREE.BufferAttribute(colors,3));
+  }
+  const cargoGeometry=ownGeo(new THREE.SphereGeometry(.77,detail?64:28,detail?40:18));
+  const ca=cargoGeometry.getAttribute('position');for(let i=0;i<ca.count;i++){const v=V(ca.getX(i),ca.getY(i),ca.getZ(i)),n=v.clone().normalize(),r=1+.042*Math.sin(n.x*9+n.z*4)*Math.cos(n.y*8)+.027*Math.sin(n.z*23+n.x*11)*Math.cos(n.y*19-n.z*4)+.013*Math.sin(n.x*57+n.y*17)*Math.cos(n.y*43+n.z*31);v.multiplyScalar(r);ca.setXYZ(i,v.x,v.y,v.z);}cargoGeometry.computeVertexNormals();cargoGeometry.computeBoundingSphere();
   const cargo=mesh(cargoGeometry,aCargo,aRoot,'UptakeProteinaceousParticle','a-particle',['uptake-particles'],A,'Particle-01');
   const igg=instances(iggGeometry(detail),iggMat,8,aRoot,'ParticleBoundIgG','a-igg',['uptake-particles'],A);
+  const iggDomains=instances(merge([
+    {geometry:ellipsoid(-.037,0,.037,.026,.021,.039,detail?12:8)},
+    {geometry:ellipsoid(.037,0,.037,.026,.021,.039,detail?12:8)},
+    {geometry:ellipsoid(0,0,.104,.029,.023,.034,detail?12:8)}
+  ]),iggMat,8,aRoot,'ParticleBoundIgGProteinDomains','a-igg',['uptake-particles'],A);
+  iggDomains.userData.scope='Generic rounded IgG domain topology; Fab faces cargo, Fc faces FcγR, not an atomic structure';
   const fc=instances(glyph('fc',detail),fcMat,8,aRoot,'CupMembraneFcGammaReceptors','a-fc',['uptake-receptors','membrane-proteins','membrane'],A);
-  const actin=instances(new THREE.CylinderGeometry(.014,.014,1,detail?6:5,1,false),actinMat,8*8,aRoot,'CytoplasmicCupActin','a-actin',['actin','membrane'],A);
-  const enzymes=instances(ellipsoid(0,0,0,.045,.028,.055,detail?14:10),enzymeMat,10,aRoot,'AlreadyLuminalProcessingEnzymes','a-enzymes',['lysosome'],A);
-  for(let i=0;i<10;i++){dummy.position.set(.88*Math.cos(i*2.4),.88*Math.sin(i*2.4),.12*Math.sin(i*.7));dummy.rotation.set(i*.6,i*.9,i*.2);dummy.scale.setScalar(1);dummy.updateMatrix();enzymes.setMatrixAt(i,dummy.matrix);}
-  enzymes.instanceMatrix.needsUpdate=true;
+  const actin=instances(new THREE.CylinderGeometry(.019,.019,1,detail?7:5,1,false),actinMat,8*8,aRoot,'CytoplasmicCupActin','a-actin',['actin','membrane'],A);
+  const enzymes=instances(merge([
+    {geometry:ellipsoid(-.047,0,0,.048,.06,.045,detail?14:10)},
+    {geometry:ellipsoid(.047,0,.012,.047,.053,.046,detail?14:10)},
+    {geometry:tubeBetween(V(-.03,-.045,.014),V(.03,-.045,.014),.016,8)}
+  ]),enzymeMat,6,aRoot,'AlreadyLuminalProcessingEnzymes','a-enzymes',['lysosome'],A);
+  const clefts=instances(ellipsoid(0,0,-.025,.02,.029,.012,detail?12:8),cleftMat,6,aRoot,'HydrolaseCatalyticClefts','a-clefts',['phagosome'],A);
+  const peptideNodes=instances(new THREE.SphereGeometry(.039,detail?10:7,detail?7:5),peptideMat,24,aRoot,'LuminalProteinSubstrateAndProducts','a-peptide',['phagosome','uptake-particles'],A);
+  const peptideBonds=instances(new THREE.CylinderGeometry(.012,.012,1,7,1,false),peptideMat,18,aRoot,'HydrolysablePeptideBonds','a-bonds',['phagosome','uptake-particles'],A);
+  const pumps=instances(merge([
+    {geometry:tubeBetween(V(0,0,-.045),V(0,0,.045),.04,detail?12:8),region:'transmembrane-V0'},
+    {geometry:tubeBetween(V(0,0,.04),V(0,0,.105),.018,8),region:'cytoplasmic-stalk'},
+    {geometry:ellipsoid(0,0,.14,.074,.065,.053,detail?14:10),region:'cytoplasmic-V1'}
+  ]),pumpMat,4,aRoot,'AcquiredVacuolarProtonPumps','a-pumps',['phagosome','membrane-proteins'],A);
+  const protons=instances(new THREE.SphereGeometry(.019,8,6),protonMat,8,aRoot,'DirectedLuminalProtonTeachingMarkers','a-protons',['phagosome'],A);
+  const lipidHeads=instances(new THREE.SphereGeometry(.022,detail?7:5,detail?5:4),lipidMat,128,aRoot,'SelectedBilayerHeadgroupBelts','a-lipids',['membrane'],A);
+  lipidHeads.userData.scope='Selected ordered headgroup belts; finite wall is one bilayer, molecular size exaggerated';
+  const processingSites=Array.from({length:6},(_,i)=>{
+    const phi=.28+i*TAU/6,n=V(.82*Math.cos(phi),.82*Math.sin(phi),.25+.09*Math.sin(i*1.8)).normalize();
+    return {normal:n,tangent:V(-Math.sin(phi),Math.cos(phi),0),phase:i/6};
+  });
+  const aActionState={acidification:0,digestion:0,cleavedBonds:0,activeSite:0};
+  const roleAnchors={membrane:V(),igg:V(),receptor:V(),actin:V(),pump:V(),proton:V(),enzyme:V(),substrate:V()};
+  function rod(o,index,a,b,width=1){const d=b.clone().sub(a);dummy.position.copy(a).add(b).multiplyScalar(.5);dummy.quaternion.setFromUnitVectors(V(0,1,0),d.normalize());dummy.scale.set(width,Math.max(1e-7,a.distanceTo(b)),width);dummy.updateMatrix();o.setMatrixAt(index,dummy.matrix);}
   // A remains one local origin. Closed/transport/maturation are representative states.
   const bPanels=Array.from({length:5},(_,i)=>{const o=new THREE.Group();o.name=`MRPanel${i+1}`;bRoot.add(o);return o;});
   const pm1=mesh(slabGeometry(2.8,1.65,.06),bMem,bPanels[0],'MRBindingPlasmaMembrane','b-pm',['membrane'],B);
@@ -217,27 +253,59 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
   // No new clock: positions are pure functions of case and normalized progress.
   const coatAngles=[.38,.73,1.08,1.43,1.78,2.13,2.48,2.83];let boundFcCount=0;
   function updateA(){
-    const r=route.update(progress),open=!r.scission;cup.visible=open;closed.visible=!open;mother.visible=!open;closed.position.copy(r.transport);
-    const digestion=smooth((progress-.82)/.18),residue=THREE.MathUtils.lerp(1,.35,digestion);cargo.scale.setScalar(residue);cargo.position.copy(r.particleCenter);
+    const r=route.update(progress),open=!r.scission;cup.visible=open;closed.visible=!open;mother.visible=!open&&progress<.68;closed.position.copy(r.transport);
+    const digestion=smooth((progress-.82)/.18),residue=THREE.MathUtils.lerp(1,.39,digestion);cargo.scale.setScalar(residue);cargo.position.copy(r.particleCenter);
     const assembly=smooth((progress-.035)/.08)*(1-smooth((progress-.62)/.12));actin.visible=assembly>1e-5;
     boundFcCount=0;
     for(let i=0;i<8;i++){
       const phi=i/8*TAU+.21,theta=coatAngles[i],n=V(Math.sin(theta)*Math.cos(phi),Math.sin(theta)*Math.sin(phi),-Math.cos(theta));
-      const iggPoint=r.particleCenter.clone().addScaledVector(n,.80*residue);atSurface(igg,iggPoint,n,residue,i);
+      const iggPoint=r.particleCenter.clone().addScaledVector(n,.80*residue);atSurface(igg,iggPoint,n,residue,i);atSurface(iggDomains,iggPoint,n,residue,i);
       const targetTheta=Math.min(theta,Math.max(.10,r.theta-.09)),targetRow=route.nc*targetTheta/r.theta,cluster=smooth((progress-(.025+i*.003))/.15),startRow=route.nc*(.70+.005*(i%3));
       const fcPoint=route.sampleMembrane(THREE.MathUtils.lerp(startRow,targetRow,cluster),phi+(1-cluster)*(.17*(i%2?1:-1)));if(!open)fcPoint.point.add(r.transport);
       atSurface(fc,fcPoint.point,fcPoint.normal,1,i);
       const ecd=fcPoint.point.clone().addScaledVector(fcPoint.normal,-.135),fcTip=iggPoint.clone().addScaledVector(n,igg.geometry.userData.iggPolarity.FcTip[2]*residue);
       if(ecd.distanceTo(fcTip)<.14)boundFcCount++;
+      if(i===5){roleAnchors.igg.copy(iggPoint);roleAnchors.receptor.copy(fcPoint.point);}
       for(let j=0;j<8;j++){
-        const ta=.10+Math.max(.08,r.theta-.35)*j/8,tb=.10+Math.max(.08,r.theta-.35)*(j+1)/8;
-        const sa=route.sampleMembrane(route.nc*ta/r.theta,phi),sb=route.sampleMembrane(route.nc*tb/r.theta,phi);
+        // Short curved/oblique filaments follow the advancing cup on its
+        // cytoplasmic side; they are not a radial cage inside the lumen.
+        const span=Math.max(.10,r.theta-.32),actinPhi=[-.035,-.09,Math.PI+.035,Math.PI+.09,-.8,-1.5,-2.3,-2.8][i],wobble=i<4?.015:.22,ta=.12+span*(.22+.72*j/8),tb=.12+span*(.22+.72*(j+1)/8),pa=actinPhi+wobble*Math.sin(j*.48+i),pb=actinPhi+wobble*Math.sin((j+1)*.48+i);
+        const sa=route.sampleMembrane(route.nc*ta/r.theta,pa),sb=route.sampleMembrane(route.nc*tb/r.theta,pb);
         const va=sa.point.addScaledVector(sa.normal,.105),vb=sb.point.addScaledVector(sb.normal,.105);if(!open){va.add(r.transport);vb.add(r.transport);}
-        const d=vb.clone().sub(va);dummy.position.copy(va).add(vb).multiplyScalar(.5);dummy.quaternion.setFromUnitVectors(V(0,1,0),d.clone().normalize());dummy.scale.set(assembly,Math.max(1e-7,d.length()),assembly);dummy.updateMatrix();actin.setMatrixAt(i*8+j,dummy.matrix);
+        rod(actin,i*8+j,va,vb,assembly*(.75+.25*Math.sin(i*1.7)**2));if(i===0&&j===5)roleAnchors.actin.copy(va);
       }
     }
-    for(const o of [fc,igg,actin]){o.instanceMatrix.needsUpdate=true;o.computeBoundingSphere();}
-    enzymes.visible=progress>=.82;enzymes.position.copy(r.particleCenter);fc.visible=true;
+    for(let row=0;row<8;row++)for(let col=0;col<8;col++){
+      const sample=route.sampleMembrane(route.nc*(.17+.76*row/7),col*TAU/8+.04*(row%2)),point=sample.point.clone();if(!open)point.add(r.transport);
+      for(let side=0;side<2;side++)atSurface(lipidHeads,point.clone().addScaledVector(sample.normal,(side?1:-1)*.021),sample.normal,.73,row*16+col*2+side);
+      if(row===5&&col===4)roleAnchors.membrane.copy(point);
+    }
+    aActionState.acidification=smooth((progress-.67)/.15);aActionState.digestion=digestion;aActionState.cleavedBonds=0;
+    pumps.visible=protons.visible=progress>=.67;
+    const pumpPhis=[-.06,Math.PI+.06,-.85,-2.3];
+    for(let i=0;i<4;i++){
+      const s=route.sampleCup(1.15+.12*(i%2),pumpPhis[i]);atSurface(pumps,s.point,s.normal,1,i);
+      for(let k=0;k<2;k++){
+        const t=((progress-.67)*23+k*.5+i*.21)%1,point=s.point.clone().addScaledVector(s.normal,.05-.23*Math.max(0,t));
+        atSurface(protons,point,s.normal,.7+.3*aActionState.acidification,i*2+k);if(i===0&&k===0)roleAnchors.proton.copy(point);
+      }
+      if(i===0)roleAnchors.pump.copy(s.point.clone().addScaledVector(s.normal,.14));
+    }
+    const processing=progress>=.82;for(const o of [enzymes,clefts,peptideNodes,peptideBonds])o.visible=processing;
+    for(let i=0;i<6;i++){
+      const site=processingSites[i],n=site.normal,t=site.tangent,cycle=clamp((progress-.82)/.18*1.85-i*.14),contact=smooth(cycle/.30),cleave=smooth((cycle-.40)/.18),release=smooth((cycle-.59)/.41);
+      const center=r.particleCenter.clone().addScaledVector(n,.73*residue+.035),enzyme=center.clone().addScaledVector(n,.19-.12*contact+.13*release);
+      atSurface(enzymes,enzyme,n,1,i);atSurface(clefts,enzyme,n,1,i);
+      const points=[];for(let j=0;j<4;j++){
+        const side=j<2?-1:1,point=center.clone().addScaledVector(t,(j-1.5)*.077+side*.095*release).addScaledVector(n,.13*release+.03*Math.sin(j*1.8)*release);
+        points.push(point);atSurface(peptideNodes,point,n,1,j+i*4);
+      }
+      for(let j=0;j<3;j++)rod(peptideBonds,i*3+j,points[j],points[j+1],j===1?1-cleave:1);
+      if(cleave>.99)aActionState.cleavedBonds++;
+      if(i===4){roleAnchors.enzyme.copy(enzyme);roleAnchors.substrate.copy(center);aActionState.activeSite=i;}
+    }
+    for(const o of [fc,igg,iggDomains,actin,lipidHeads,pumps,protons,enzymes,clefts,peptideNodes,peptideBonds]){o.instanceMatrix.needsUpdate=true;o.computeBoundingSphere();}
+    fc.visible=true;
     anchors.focus.copy(r.particleCenter).multiplyScalar(.65);anchors.inside.copy(r.particleCenter).add(V(0,1.9,1.8));anchors.insideTarget.copy(r.particleCenter);
   }
   function updateB(){
@@ -259,7 +327,13 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
   }
   function applySection(){
     group.updateWorldMatrix(true,false);localPlane.set(isParticleUptakeCase(caseId)?V(0,-1,0):V(0,0,-1),THREE.MathUtils.lerp(2.6,isParticleUptakeCase(caseId)?-.8:-.08,section));worldPlane.copy(localPlane).applyMatrix4(group.matrixWorld);
-    for(const mat of materialSet)mat.clippingPlanes=section>.001?[worldPlane]:[];
+    // This is a membrane cutaway, not a biological hole. Preserve the intact
+    // IgG-coated cargo while cutting the membrane and its attached proteins.
+    // The caller labels this view explicitly and zero restores every surface.
+    for(const mat of materialSet){
+      const completeCargo=isParticleUptakeCase(caseId)&&[aCargo,iggMat,enzymeMat,cleftMat,peptideMat,protonMat].includes(mat);
+      mat.clippingPlanes=section>.001&&!completeCargo?[worldPlane]:[];
+    }
   }
   function seek(p=0){
     if(disposed)throw new Error('Uptake scenario disposed');progress=clamp(p);
@@ -280,23 +354,35 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
     const r=entry.role;
     if(r==='a-particle'||r==='a-igg')return progress<A_ROUTE_EVENT?['uptake-particles']:['uptake-particles','phagosome'];
     if(r==='a-fc')return ['uptake-receptors','membrane-proteins',progress<A_ROUTE_EVENT?'membrane':'phagosome'];
-    if(r==='a-enzymes')return ['phagosome'];
+    if(['a-enzymes','a-clefts','a-protons'].includes(r))return ['phagosome'];
+    if(r==='a-lipids')return [progress<A_ROUTE_EVENT?'membrane':'phagosome'];
     if(r==='a-actin')return ['actin',progress<A_ROUTE_EVENT?'membrane':'phagosome'];
     if(r==='b-mr')return ['uptake-receptors','membrane-proteins',stageIndex===0||stageIndex===4?'membrane':stageIndex===2?'endosome':'transport-vesicles'];
     if(r==='b-ligand')return ['uptake-ligands',...(stageIndex===0?[]:[stageIndex===1?'transport-vesicles':stageIndex===2?'endosome':'lysosome'])];
     return entry.dependencies;
   }
-  function label(id,title,position,keys,visible=true){return {id,title,text:title,position:position.clone().applyMatrix4(group.matrixWorld),visible,dependencies:keys};}
+  function label(id,title,position,keys,visible=true,extra={}){
+    const targetRoles={'a-membrane':progress<A_ROUTE_EVENT?['a-cup','a-lipids']:['a-closed','a-lipids'],'a-igg':['a-igg'],'a-cargo':['a-particle','a-igg'],'a-receptor':['a-fc'],'a-cytoskeleton':['a-actin'],'a-processing':['a-enzymes','a-clefts'],'a-acidification':['a-pumps'],'a-products':['a-peptide','a-bonds'],'b-receptor':['b-mr'],'b-ligand':['b-ligand']};
+    return {id,title,text:title,position:position.clone().applyMatrix4(group.matrixWorld),visible,dependencies:keys,targetRoles:targetRoles[id]??[],...extra};
+  }
   function getLabelState(){
     group.updateWorldMatrix(true,false);
     const labels=[];
     if(handoff.active)labels.push(label('uptake-handoff','阶段交接：出芽/裂分/融合中间过程省略',V(0,1.25,0),[],true));
     if(isParticleUptakeCase(caseId)){
-      labels.push(label('a-cargo',caseId===C?'IgG调理的非感染性抗原载体':'IgG标记的非病毒蛋白颗粒',route.state.particleCenter.clone().add(V(.1,0,.25)),['uptake-particles',...(progress<A_ROUTE_EVENT?[]:['phagosome'])]));
-      labels.push(label('a-receptor',caseId===C?'FcγR识别IgG-Fc：结合域朝腔面':'FcγR：结合域朝胞外/腔面',route.state.particleCenter.clone().add(V(-.75,.6,-.35)),['uptake-receptors','membrane-proteins',progress<A_ROUTE_EVENT?'membrane':'phagosome'],progress<.76));
-      labels.push(label('a-cytoskeleton','胞质侧局部actin',route.state.particleCenter.clone().add(V(.6,-.8,-.45)),['actin',progress<A_ROUTE_EVENT?'membrane':'phagosome'],progress<.74));
-      if(caseId===C)labels.push(label('viral-antigen-boundary','非感染性载体 · 不连接胞质RNA',route.state.particleCenter.clone().add(V(0,1.05,-.15)),['uptake-particles']));
-      if(progress>=.82)labels.push(label('a-processing',caseId===C?'抗原载体留在腔内处理':'腔内处理；递送过程省略',route.state.particleCenter.clone().add(V(.72,.35,0)),['phagosome']));
+      const membraneKey=progress<A_ROUTE_EVENT?'membrane':'phagosome';
+      labels.push(label('a-membrane',progress<A_ROUTE_EVENT?'单层膜杯 · 脂质双层':'吞噬体限制膜 · 单个脂质双层',roleAnchors.membrane,[membraneKey],true,{color:'#739c9d',action:'分隔胞质与胞外／腔内',description:'青灰色壁有实际厚度；浅色小珠只标示选定的磷脂头部带。剖切是教学观察窗口，不是生物学孔洞。'}));
+      labels.push(label('a-cargo',caseId===C?'非感染性病毒相关抗原载体':'待降解的蛋白质颗粒',route.state.particleCenter.clone().add(V(.1,0,.25)),['uptake-particles',...(progress<A_ROUTE_EVENT?[]:['phagosome'])],true,{color:'#a68162',action:progress<.82?'被包入腔内':'表面蛋白逐步被切解',description:caseId===C?'限定为IgG调理的非感染性教学载体；此分支不表示病毒入侵、复制或胞质RNA。':'棕色粗糙实体是吞噬货物；货物始终留在胞外连通的膜杯腔或闭合吞噬体腔内。'}));
+      if(progress<.76){
+        labels.push(label('a-igg','IgG · Fab朝颗粒，Fc朝外',roleAnchors.igg,['uptake-particles',...(progress<A_ROUTE_EVENT?[]:['phagosome'])],true,{color:'#d6ad4f',action:'为FcγR提供识别把手',description:'金色Y形抗体两条Fab臂结合颗粒，Fc端朝向膜受体；这是结构拓扑符号，不是原子级抗体模型。'}));
+        labels.push(label('a-receptor','FcγR · 跨膜识别受体',roleAnchors.receptor,['uptake-receptors','membrane-proteins',membraneKey],true,{color:'#765191',action:'沿膜聚集并识别IgG的Fc',description:'紫色双结构域位于胞外／腔面，跨膜段嵌入膜，短尾位于胞质侧；受体不直接识别所有抗原。'}));
+      }
+      if(progress>.04&&progress<.74)labels.push(label('a-cytoskeleton','F-actin · 胞质侧支架',roleAnchors.actin,['actin',membraneKey],true,{color:'#cb944b',action:'局部组装，伴随杯缘推进后消退',description:'赭色曲线位于膜的胞质侧。示意局部肌动蛋白重排，不表示刚性笼子或腔内纤维。'}));
+      if(progress>=.67)labels.push(label('a-acidification','V-ATPase · 向腔内泵H⁺',roleAnchors.pump,['phagosome','membrane-proteins'],true,{color:'#536e9b',action:'ATP驱动质子跨限制膜进入腔内',description:'蓝色V1大头朝胞质，V0跨膜；粉色小点是有方向的H⁺教学标记。此处展示已获得酸化装置的状态；膜蛋白递送和供体融合省略，不标定通用pH或时长。'}));
+      if(progress>=.82){
+        labels.push(label('a-processing','酸性水解酶 · 催化裂隙',roleAnchors.enzyme,['phagosome'],true,{color:'#358778',action:'靠近底物，催化肽键水解，再分离',description:'青绿色双叶形为蛋白酶拓扑符号，桃色裂隙标示催化区域。酶与底物不同色，酶不随反应一起消耗；酶的递送与供体融合省略。'}));
+        labels.push(label('a-products','蛋白链 → 较短的肽片段',roleAnchors.substrate,['phagosome','uptake-particles'],true,{color:'#d6a479',action:'中央连接断开，两段产物在腔内分离',description:'浅棕色四节点链代表蛋白片段。动画显示一次代表性的切键、释放和货物逐渐变小；不是原子反应、精确化学计量或向胞质泄漏。'}));
+      }
     }else{
       const r=[mr1,mr2,mr3,mr4,mr5][stageIndex],l=[l1,l2,l3,l4,l5][stageIndex];
       labels.push(label('b-receptor',stageIndex===4?'MR-01：已返回表面':'MR-01：始终嵌在膜上',r.position,getObjectVisibilityDependencies(r)));
@@ -307,13 +393,37 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
     return labels;
   }
   function getLabelVisibilityDependencies(id){const l=getLabelState().find(x=>x.id===id);return l?l.dependencies:null;}
+  function getTeachingState(){
+    const base={index:stageIndex,chapterIndex:isParticleUptakeCase(caseId)?(progress<.62?0:progress<.82?1:2):(stageIndex<2?0:stageIndex<3?1:2),caseId,progress,roles:getLabelState().filter(x=>x.visible).map(x=>({id:x.id,title:x.title,action:x.action,description:x.description,color:x.color,position:x.position.clone()}))};
+    if(!isParticleUptakeCase(caseId)){const s=UPTAKE_STAGES[caseId][stageIndex];return {...base,title:s.title,input:'甘露糖受体与可溶糖蛋白',action:s.desc,result:stageIndex<2?'配体位于胞外或封闭载体腔内':'受体随膜回收，配体保留在内吞腔',motion:{title:s.name,description:s.omission??'按当前进度显示同一受体及其配体的位置'},omission:s.omission??null};}
+    const cargoName=caseId===C?'IgG调理的非感染性抗原载体':'IgG调理的蛋白质颗粒';
+    let description;
+    if(progress<.08)description={title:'1 · 识别调理颗粒',input:cargoName,action:'FcγR结合朝外的IgG-Fc；Fab仍结合颗粒',result:'颗粒与受体在膜表面建立接触',motion:{title:'识别方向',description:'金色抗体连接棕色颗粒与紫色膜受体；受体的短尾朝胞质。'}};
+    else if(progress<.46)description={title:'1 · 膜杯连续包裹',input:'颗粒表面的多价IgG与膜上的FcγR',action:'受体沿连续膜聚集；胞质侧F-actin局部重排',result:'膜杯上升，货物仍处于与胞外连通的杯腔',motion:{title:'杯缘推进',description:'青灰色膜实际弯曲为三维杯；赭色F-actin跟随胞质侧，并在封闭后消退。'}};
+    else if(progress<.62)description={title:'1 · 收颈并准备封闭',input:'包住大部分货物的连续膜杯',action:'真实开口逐渐缩窄；膜杯、细颈与母膜仍相连',result:'杯腔尚未成为封闭吞噬体',motion:{title:'开口缩窄',description:'此时仍能沿细颈通向胞外；没有把剖切窗口当作生物学孔洞。'}};
+    else if(progress<.67)description={title:'2 · 封闭后开始运输',input:'完成收颈的膜杯',action:'一次有限细颈拓扑裂分，形成独立闭合的吞噬体',result:'货物被限制在闭合腔内；酸化和酶获得尚未等同于刚闭合',motion:{title:'闭合腔向内移',description:'吞噬体与母膜成为两个闭合边界；裂分蛋白和脂双层叶级动力学没有模拟。'}};
+    else if(progress<.82)description={title:'2 · 建立成熟的酸化条件',input:'闭合吞噬体，已获得V-ATPase的代表性状态',action:'胞质侧V1提供驱动，V0将H⁺转移到腔内',result:'酸化为腔内水解酶提供适宜环境；不是单纯缩小一个球',motion:{title:'定向泵入H⁺',description:'蓝色装置跨膜，蓝色大头位于胞质侧；粉色点按固定方向进入腔内，数量与速度经教学调整。'},omission:'酸化装置／水解酶的递送、内体与溶酶体的供体融合在本局部示意中省略；不把运输直接称为完整成熟。'};
+    else {const phase=progress<.865?'酶接近底物':progress<.935?'切开代表性肽键':'较短片段释放';description={title:'3 · 腔内切解与残余',input:'蛋白质底物与已在腔内的酸性水解酶',action:'青绿蛋白酶接近浅棕底物；中央肽键断开，产物分离',result:'大货物逐渐变小，较短肽片段与残余保留在腔内',motion:{title:phase,description:`当前已完成${aActionState.cleavedBonds}/6个示意切键位点；水解酶保留原形并与片段分离。颜色、位点数量和时序是教学调整。`},omission:'不模拟原子化学、通用蛋白酶结构、精确计量或完整酶递送过程。'};}
+    return {...base,...description,actions:{...aActionState},scope:caseId===C?'Noninfectious antigen clearance; not viral entry, replication or cytosolic RNA release':'Representative FcγR-mediated protein-particle phagocytosis'};
+  }
+  function getPresentationBounds(){
+    if(isParticleUptakeCase(caseId)){
+      // Exclude the cropped parent-membrane skirt from framing. The cup and
+      // the complete cargo remain in the active teaching volume.
+      const c=route.state.particleCenter;return new THREE.Box3(V(-1.43,-1.28,Math.min(c.z-1.24,-.18)),V(1.43,1.12,c.z+1.24));
+    }
+    const bounds=new THREE.Box3();group.updateMatrixWorld(true);const inverse=group.matrixWorld.clone().invert();
+    for(const {object:o} of bindings)if(visibleInTree(o)){o.geometry.computeBoundingBox();const b=o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld).applyMatrix4(inverse);bounds.union(b);}
+    return bounds.expandByScalar(.12);
+  }
+  function getSuggestedCameraDirection(){return isParticleUptakeCase(caseId)?V(.28,.82,.83).normalize():V(.24,-.36,1).normalize();}
   const sourceLocations=whole?.organelleLocations instanceof Map?Object.fromEntries(['membrane','endosome','lysosome','phagosome'].map(id=>[id,whole.organelleLocations.get(id)?.position?.toArray()??null])):null;
   const metadata={teachingOnly:true,normalized:true,notElectronMicroscopySegmentation:true,caseIds:[A,B],secondClock:false,wholeBinding:'read-only representative locations; never writes whole progress or geometry',wholeSourceLocations:sourceLocations,
     actualContinuity:['B sorting body, taper and recycling tube share indexed rings on outer and inner interfaces'],
     omittedProcesses:['A connection to the intact whole atlas membrane; molecular scission machinery, leaflet kinetics and fluid forces (local membrane continuity and finite-neck topological split are shown)','A donor fusion and enzyme delivery in this standalone panel','B uptake budding/scission and carrier-endosome fusion','B recycling-neck fission, later ligand delivery and carrier-plasma-membrane fusion'],
     transitionPolicy:'A: connected shared-index membrane growth then instantaneous finite-neck scission, no opacity handoff. B: original labelled single-state phase handoffs retained',
     dimensions:'Independent normalized teaching units; object scale, duration and speed are not measurements',
-    sources:[{id:'Fc-gamma-function',url:'https://pubmed.ncbi.nlm.nih.gov/2139103/'},{id:'actin-Fc',url:'https://pubmed.ncbi.nlm.nih.gov/8760816/'},{id:'MR-recycling',url:'https://pubmed.ncbi.nlm.nih.gov/6766809/'},{id:'MR-ligand-delivery',url:'https://pubmed.ncbi.nlm.nih.gov/6087792/'},{id:'human-MR-conditional',url:'https://pubmed.ncbi.nlm.nih.gov/6298410/'}]};
+    sources:[{id:'Fc-gamma-function',url:'https://pubmed.ncbi.nlm.nih.gov/2139103/'},{id:'actin-Fc',url:'https://pubmed.ncbi.nlm.nih.gov/8760816/'},{id:'EM-cup-phases',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC2212093/'},{id:'phagosome-maturation',url:'https://pubmed.ncbi.nlm.nih.gov/8120091/'},{id:'V-ATPase-acidification',url:'https://rupress.org/jcb/article/221/3/e202107174/212963/Detection-and-quantification-of-the-vacuolar-H'},{id:'proteolysis-resolution',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC8241537/'},{id:'MR-recycling',url:'https://pubmed.ncbi.nlm.nih.gov/6766809/'},{id:'MR-ligand-delivery',url:'https://pubmed.ncbi.nlm.nih.gov/6087792/'},{id:'human-MR-conditional',url:'https://pubmed.ncbi.nlm.nih.gov/6298410/'}]};
   const facts=['A选择有吞噬活性的FcγR代表，IgG预置于可降解非病毒蛋白颗粒。','FcγR与MR为有身份的教学符号，不是原子结构表面；普通球状背景分子仍无特定蛋白身份。','MR回收的是跨膜受体及其所在膜，配体保留在内吞系统腔内去处理；不把大颗粒接入该回收支路。','MR结合域朝胞外或腔面，短尾朝胞质；此关系在回收前后保持。','A局部杯与背景膜实际共索引连通、薄颈收窄后瞬时裂分；不模拟裂分蛋白或流体。B静态分选内体与回收管共用索引环；B的裂分、递送及融合中间态按标示省略。','比例、颜色、大小和48秒时长是教学调整，不代表实测pH、速度、反应或所有巨噬细胞表达。'];
   const antigenMetadata={...metadata,caseIds:[A,B,C],caseAlias:{id:C,reusesGeometryOf:A,nonInfectiousAntigenCarrier:true,notGenericVirionEntry:true,cytosolicRNAIsIndependent:true},scope:'Only an IgG-opsonized noninfectious viral-antigen teaching carrier; not a universal viral entry, replication or infection route'};
   const antigenFacts=['限定案例：IgG调理的非感染性病毒相关抗原教学载体，不是可复制病毒或通用virion模型。','FcγR识别载体表面的IgG-Fc；此处不把抗原本身画成FcγR的通用配体。','复用A的共享索引膜杯、实际细颈与有限瞬时裂分；货物始终留在胞外连通杯腔或封闭吞噬体腔。','本摄取分支不连接胞质RNA；病毒应答中的胞质RNA始终是独立条件分支，不能由摄取自动推出。','48秒、比例、符号和处理大小均为教学调整；不展示感染、复制或逃逸。'];
@@ -324,11 +434,12 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
     const currentStage=UPTAKE_STAGES[caseId][stageIndex];
     return {...(caseId===C?{caseAlias:{id:C,reusesGeometryOf:A,nonInfectiousAntigenCarrier:true,FcGammaRecognizes:'IgG-Fc',notGenericVirionEntry:true,cytosolicRNAIsIndependent:true}}:{}),continuousA:isParticleUptakeCase(caseId)?{...route.state,particleCenter:route.state.particleCenter.toArray(),transport:route.state.transport.toArray(),cupCenter:route.state.cupCenter.toArray(),boundReceptorCount:boundFcCount,neckOpeningStillExtracellular:progress<A_ROUTE_EVENT,scissionModel:route.metadata.scissionModel}:null,caseId,progress,stageIndex,currentStage:currentStage.name,stage:currentStage,section,teachingOnly:true,macroClockOwnedByCaller:true,wholeWritten:false,handoff:{...handoff},omission:currentStage.omission??null,representationKind:'independent-normalized-teaching-panel',
       renderEstimate:{logicalRenderables:bindings.filter(e=>visibleInTree(e.object)).length,triangles:bindings.filter(e=>visibleInTree(e.object)).reduce((n,e)=>n+e.object.geometry.index.count/3*(e.object.isInstancedMesh?e.object.count:1),0),scope:'Logical visible meshes; excludes additional transmission/AO/shadow GPU passes'},objects:bindings.map(e=>({name:e.object.name,role:e.role,identity:e.object.userData.identity??null,visible:visibleInTree(e.object),dependencies:getObjectVisibilityDependencies(e.object)})),
+      processing:isParticleUptakeCase(caseId)?{...aActionState,V1Orientation:'cytoplasmic',V0Orientation:'transmembrane',hydrolaseDeliveryMode:'already-luminal-state; donor fusion omitted',proteinChainCleavage:'representative generic proteolysis, not an atomic reaction',membraneThickness:route.state.membraneThickness}:null,
       mr:caseId===B?{identity:'MR-01',stage:stageIndex,surfaceParameter:stageIndex===2?THREE.MathUtils.lerp(.29,.88,smooth((progress-.38)/.30)):null,ectodomain:'extracellular-or-luminal',tail:'cytoplasmic'}:null};
   }
   const totalTriangles=()=>bindings.reduce((n,{object:o})=>n+(o.geometry.getIndex()?.count??o.geometry.getAttribute('position').count)/3*(o.isInstancedMesh?o.count:1),0);
-  const stats={detail,renderables:bindings.length,totalAllocatedInstanceTriangles:totalTriangles(),uniqueGeometryTriangles:[...geometrySet].reduce((n,g)=>n+g.index.count/3,0),logicalRenderableCount:bindings.length,maxActiveLogicalRenderables:6,drawCallScope:'Logical mesh draw estimate only; transmission, AO, shadow and renderer passes add actual GPU draws',sortingInterfaceRings:detail?84:52,sortingRadialSegments:detail?39:24,sharedIndexedContinuum:true,biologicalUnits:false};
+  const stats={detail,renderables:bindings.length,totalAllocatedInstanceTriangles:totalTriangles(),uniqueGeometryTriangles:[...geometrySet].reduce((n,g)=>n+g.index.count/3,0),logicalRenderableCount:bindings.length,maxActiveLogicalRenderables:13,drawCallScope:'Logical mesh draw estimate only; transmission, AO, shadow and renderer passes add actual GPU draws',sortingInterfaceRings:detail?84:52,sortingRadialSegments:detail?39:24,sharedIndexedContinuum:true,biologicalUnits:false};
   function dispose(){if(disposed)return;disposed=true;for(const g of geometrySet)g.dispose();for(const m of materialSet)m.dispose();group.removeFromParent();group.clear();}
   seek(0);
-  return {group,radius:3.15,anchors,setCase,seek,setProgress:seek,update,setPresentation(mode){if(!['local','whole'].includes(mode))throw new RangeError('Unknown presentation');group.visible=mode==='local';},setSection,getFocus,getInspectionTarget,getLabelState,getWholeProgress,getDriverState,getVisibilityBindings:()=>bindings.map(x=>({...x,dependencies:[...x.dependencies]})),getObjectVisibilityDependencies,getLabelVisibilityDependencies,getDiagnostics,dispose,stats,get metadata(){return caseId===C?antigenMetadata:metadata;},get facts(){return caseId===C?antigenFacts:facts;},debug:{continuousA:route}};
+  return {group,radius:3.15,anchors,setCase,seek,setProgress:seek,update,setPresentation(mode){if(!['local','whole'].includes(mode))throw new RangeError('Unknown presentation');group.visible=mode==='local';},setSection,getFocus,getInspectionTarget,getLabelState,getTeachingState,getPresentationBounds,getSuggestedCameraDirection,getWholeProgress,getDriverState,getVisibilityBindings:()=>bindings.map(x=>({...x,dependencies:[...x.dependencies]})),getObjectVisibilityDependencies,getLabelVisibilityDependencies,getDiagnostics,dispose,stats,get metadata(){return caseId===C?antigenMetadata:metadata;},get facts(){return caseId===C?antigenFacts:facts;},debug:{continuousA:route}};
 }

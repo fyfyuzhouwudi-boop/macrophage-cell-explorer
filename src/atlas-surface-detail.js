@@ -88,6 +88,9 @@ export function createAtlasSurfaceDetail({THREE,mode='conservative',size=128,see
   record.hook=function(shader,renderer){record.previousCompile.call(this,shader,renderer);compileCalls++;if(inject(shader,record.uniforms))injectedCompiles++;else{unsupportedCompiles++;issues.push('Unsupported shader chunks; prior shader retained for '+(this.name||this.uuid||'material'));}};
   OWNERS.set(material,token);records.set(material,record);if(mode!=='original')enable(record);return record;}
  function forget(record){disable(record);OWNERS.delete(record.material);records.delete(record.material);}
+ // A new inspection has its own shader ownership. Copy the host finish but
+ // unwrap this overlay before registering the copy, so GLSL is injected once.
+ function cloneMaterial(source){alive();const clone=source.clone(),record=records.get(source);clone.onBeforeCompile=record?.previousCompile??source.onBeforeCompile;clone.customProgramCacheKey=record?.previousKey??source.customProgramCacheKey;return clone;}
  function apply(root){alive();if(typeof root?.traverse!=='function')throw new TypeError('Surface detail root must support traverse');const usage=new Map();
   root.traverse(object=>{if(!object.isMesh)return;for(const material of Array.isArray(object.material)?object.material:[object.material]){if(!material||!material.isMeshStandardMaterial&&!material.isMeshPhysicalMaterial)continue;let item=usage.get(material);if(!item){item={roles:new Set(),blocked:false};usage.set(material,item);}const role=select(object,material);if(role==='film'||role==='membrane')item.roles.add(role);else item.blocked=true;}});
   const next=new Set();let skippedShared=0;for(const[material,item]of usage){if(item.blocked||!item.roles.size){if(item.blocked&&item.roles.size)skippedShared++;continue;}const role=item.roles.has('film')?'film':'membrane';let record=records.get(material);if(!record)record=makeRecord(material,role);record.roots.add(root);next.add(material);}
@@ -96,7 +99,7 @@ export function createAtlasSurfaceDetail({THREE,mode='conservative',size=128,see
  function restore(root){alive();if(root==null)return setMode('original');const materials=roots.get(root);if(!materials)return diagnostics();for(const material of materials){const record=records.get(material);record.roots.delete(root);if(!record.roots.size)forget(record);}roots.delete(root);requestRender();return diagnostics();}
  function diagnostics(){return{version:VERSION,mode,disposed,registeredRoots:roots.size,registeredMaterials:records.size,enabledMaterials:[...records.values()].filter(r=>r.enabled).length,texture:{size,seed,baseBytes:size*size*4,approxMipBytes:Math.ceil(size*size*4*4/3),disposed:textureDisposed},compileCalls,injectedCompiles,unsupportedCompiles,issues:[...new Set(issues)],timeUniform:false,vertexDisplacement:false,changesOpacityOrTransmission:false,ownsAOOrDepth:false,roughnessMapRemapWeight:mode==='original'?null:.2,additionalReliefEnabled:mode==='conservative'};}
  function dispose(){if(disposed)return diagnostics();for(const record of records.values())disable(record);for(const material of records.keys())OWNERS.delete(material);records.clear();roots.clear();texture.dispose();textureDisposed=true;disposed=true;requestRender();return diagnostics();}
- return{apply,setMode,restore,dispose,diagnostics};
+ return{apply,setMode,restore,dispose,diagnostics,cloneMaterial};
 }
 
 export { createAtlasSurfaceDetail as createAtlasSurfaceDetailV2 };

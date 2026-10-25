@@ -1,5 +1,7 @@
 // Coarse, representative endolysosomal domains for the whole-cell view.
 // These are teaching meshes, not a morphology classifier or EM segmentation.
+import {createDegradativeLumenGeometry} from './compartment-ultrastructure.js';
+import {applyWholeOrganelleFinish} from './whole-organelle-finish.js';
 const TAU = Math.PI * 2;
 function seeded(seed) { let x = seed >>> 0; return () => ((x = (1664525 * x + 1013904223) >>> 0) / 4294967296); }
 
@@ -40,13 +42,6 @@ export function createSortingEndosomeGeometry(THREE, { tubuleLength = 1.15, bend
   const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geometry.setIndex(indices); geometry.computeVertexNormals(); geometry.computeBoundingSphere();
   geometry.userData = { teachingOnly: true, bodyAndTubuleSharePort: true, closedEnd: true, sharedNeckRing: rings[22], sortingPath: path.map(q => q.toArray()), notUniversalMorphology: true };
   return geometry;
-}
-
-function lobedGeometry(THREE) {
-  // One connected low-resolution lobed envelope, rather than a colored sphere.
-  const g = new THREE.IcosahedronGeometry(1, 1), p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), r = 0.83 + 0.13 * Math.sin(4 * x + y) * Math.cos(5 * y - z) + 0.05 * Math.cos(7 * z); p.setXYZ(i, x * r, y * r * 0.78, z * r * 0.91); }
-  g.computeVertexNormals(); g.computeBoundingSphere(); return g;
 }
 
 export function createWholeVesicleDomain({ THREE, id, radius, variant = 0, wallMaterial, cargoMaterial, makeMaterial, shardGeometry }) {
@@ -90,20 +85,32 @@ export function createWholeVesicleDomain({ THREE, id, radius, variant = 0, wallM
     stats.intralumenalVesicles = count;
     stats.note = 'Representative early sorting, multivesicular late and recycling domains; neither tubular shape nor ILVs uniquely identifies an endosome.';
   } else {
-    representativeStage = variant === 0 ? 'fusion-competent-degradative-compartment' : variant === 1 ? 'heterogeneous-partly-digested-residue' : 'enzyme-rich-degradative-compartment';
-    const enzymeGeometry = ownGeo(lobedGeometry(THREE)), enzymeMaterial = cargoMaterial, residueMaterial = ownMat('#b0a18b', 0.75), count = variant === 1 ? 12 : 18;
-    const residueCount = variant === 1 ? 8 : variant === 0 ? 4 : 2;
-    // Place the large heterogeneous remnants first; enzyme-rich and residual
-    // examples are deliberately not all identical bags of granules.
-    for (let i = 0; i < residueCount; i++) {
-      const r = radius * (0.12 + rand() * 0.09), point = pack(r), residue = mesh('LysosomalPartlyDigestedLamellarResidue', shardGeometry, residueMaterial, point, new THREE.Vector3(r, r * (0.65 + rand() * 0.25), r));
-      residue.rotation.set(rand() * TAU, rand() * TAU, rand() * TAU); stats.residuePieces++;
+    representativeStage = variant === 0 ? 'fusion-competent-heterogeneous-degradative-compartment' : variant === 1 ? 'heterogeneous-partly-digested-residue' : 'selected-degradative-compartment-with-lower-residual-load';
+    const content=createDegradativeLumenGeometry({detail:false,variant});
+    const residueGeometry=ownGeo(content.residueGeometry.scale(radius,radius,radius)),remnantGeometry=ownGeo(content.remnantGeometry.scale(radius,radius,radius));
+    const residueMaterial=ownMat('#ffffff',.88,{vertexColors:true,transparent:false,opacity:1,transmission:0,clearcoat:0,envMapIntensity:.36,map:null,bumpMap:null,bumpScale:0,roughnessMap:null});
+    const remnantMaterial=ownMat('#ae9298',.77,{transparent:false,opacity:1,transmission:0,clearcoat:0,envMapIntensity:.36,map:null,bumpMap:null,bumpScale:0,roughnessMap:null,side:THREE.FrontSide});
+    residueMaterial.userData.atlasMaterialRole='cargo';remnantMaterial.userData.atlasMaterialRole='membrane';
+    const inverseRadius=1/Math.max(.2,radius);
+    applyWholeOrganelleFinish(residueMaterial,{contrast:.25,relief:.0038,roughnessVariation:.10,scale:11.2*inverseRadius,maxSlope:.18,seed:11.8,softScatter:.02});
+    applyWholeOrganelleFinish(remnantMaterial,{contrast:.18,relief:.0024,roughnessVariation:.09,scale:9.6*inverseRadius,maxSlope:.16,seed:14.2,softScatter:.02});
+    const residual=mesh('HeterogeneousEndolysosomalDenseResidualDomains',residueGeometry,residueMaterial,new THREE.Vector3(),new THREE.Vector3(1,1,1));
+    residual.userData.contentDomain='heterogeneous-unresolved-residual-material';
+    const remnant=mesh('EccentricPartialLuminalMembraneCurls',remnantGeometry,remnantMaterial,new THREE.Vector3(),new THREE.Vector3(1,1,1));
+    remnant.userData.contentDomain='selected-luminal-membrane-remnants-not-limiting-membranes';remnant.userData.closedLuminalMembraneRemnant=true;
+    for(const placement of content.placements){
+      const point=placement.point.clone().multiplyScalar(radius),envelope=placement.envelope*radius;
+      if(point.length()+envelope>radius*.84)throw Error('Degradative content exceeds its reserved packing envelope');
+      placements.push({point,envelope,kind:placement.kind});
     }
-    for (let i = 0; i < count; i++) {
-      const r = radius * (0.055 + rand() * 0.035), point = pack(r), enzyme = mesh('LysosomalLobedHydrolase', enzymeGeometry, enzymeMaterial, point, new THREE.Vector3(r, r, r));
-      enzyme.userData.contentDomain = 'soluble-hydrolase'; stats.hydrolases++;
-    }
-    stats.note = 'Representative heterogeneous degradative lumen; not all lysosomes contain remnants, and macrophage lysosomes may also be tubular.';
+    // Keep a single opaque limiting membrane. Internal membrane remnants are
+    // exposed by the existing cutaway and never require a transparent stack.
+    wallMaterial.transmission=0;wallMaterial.transparent=false;wallMaterial.opacity=1;wallMaterial.depthWrite=true;
+    wallMaterial.roughness=Math.max(.68,wallMaterial.roughness);wallMaterial.clearcoat=0;wallMaterial.envMapIntensity=Math.min(.42,wallMaterial.envMapIntensity);
+    wallMaterial.needsUpdate=true;
+    stats.residuePieces=content.stats.denseResidualDomains;stats.partialLuminalMembraneCurls=content.stats.partialLuminalMembraneCurls;stats.hydrolases=0;stats.sourceStudies=content.sources;
+    stats.contentMeshCount=2;stats.electronDensityDoesNotMeasureActivity=true;
+    stats.note='Selected heterogeneous endolysosomal representatives: irregular dense residual domains and eccentric partial membrane remnants. No free enzyme identity is inferred from EM appearance; not all lysosomes contain these remnants. The third variant denotes lower residual load, not enzyme activity.';
   }
   const summary = { ...stats, representativeStage, lumenClearance: Math.min(...placements.map(q => radius - q.point.length() - q.envelope)), largestPackedEnvelope: Math.max(0, ...placements.map(q => q.envelope)), contentCount: placements.length };
   lumen.userData = { ...lumen.userData, organelleId: id, representativeDomain: summary, teachingOnly: true };

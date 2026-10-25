@@ -1,0 +1,29 @@
+{
+  "version": "6.1.0",
+  "date": "2026-10-25",
+  "htmlSha256": "cf673162f7e5a9dea5b2525e3b35a3405034c0291c68d69d96f0ff28f19c0cff",
+  "htmlBytes": 34011625,
+  "portableZipSha256": "e2dcbb1653e2a5c09fe8433872d2e211a71966687b5700897e294d1d4267d3bd",
+  "portableZipBytes": 18887741,
+  "checks": {
+    "uptakeAndViralNativeBrowser": 54,
+    "cooperationNativeBrowser": 83,
+    "cpuMechanisms": 277,
+    "total": 414,
+    "screenshots": 50,
+    "javascriptErrorsInCheckedScenes": 0,
+    "publicationNpmTests": 13
+  },
+  "guide": {
+    "pages": 25,
+    "sha256": "41fa84b69cdbb6aaae1e3832c4e9e3a8f0aa95ddcd83f3aa455c6cbace1fcda7",
+    "replacementCharacters": 0,
+    "allPagesContainText": true,
+    "renderedPages": 25
+  },
+  "limits": [
+    "Targeted browser and CPU checks, not exhaustive device testing or a frame-rate measurement.",
+    "No reference-image rendering parity claimed.",
+    "Literature-informed teaching geometry; not a measured in-situ EM reconstruction."
+  ]
+}

@@ -96,14 +96,44 @@ export function createAtlasVisibility({ container = null, whole = null, onBefore
   function closeupAllows(object,keys,scope){
     if(context.skeletonFocus){
       if(scope==="whole")return keys.includes("cytoskeleton");
-      if(scope==="scenario:cytoskeleton-network")return keys.includes(context.skeletonFocus==="mtoc"?"microtubules":context.skeletonFocus);
+      if(scope==="scenario:cytoskeleton-network")return keys.includes(context.skeletonFocus==='network'?'cytoskeleton':context.skeletonFocus==="mtoc"?"microtubules":context.skeletonFocus);
+    }
+    // The separately registered whole-cell network must follow the same
+    // observation isolation as whole-cell organelles, including DOF/AO passes.
+    if(context.reactionCloseup&&scope==='scenario:cytoskeleton-network')return false;
+    if(scope==='scenario:virus'&&context.reactionCloseup){
+      const role=records.get(object)?.role,key=context.reactionKey??'',name=object.name;
+      const roles={
+        particle:['external-or-taken-viral-particle-and-components','uptake-endosomal-compartment-and-associated-domains','host-uptake-membrane-local-context'],
+        'endosomal-processing':['uptake-endosomal-compartment-and-associated-domains','external-or-taken-viral-particle-and-components','viral-component-fragments-in-endosomal-lumen'],
+        'cytosolic-recognition':['independent-conditional-cytosolic-viral-RNA','host-cytosolic-RNA-sensor-example'],
+        MAVS:['mitochondrial-outer-membrane-adaptor-schematic'],
+        'TBK1-activation':['host-MAVS-downstream-kinase-excerpt'],
+        'nuclear-transcription':['host-nuclear-transcription-teaching-projection'],
+        'mRNA-to-ER':['host-messenger-RNA-export-to-ER-schematic'],
+        'ER-translation':['host-ER-translation-local-excerpt'],
+        'Golgi-processing':['host-Golgi-processing-local-excerpt'],
+        exocytosis:['host-IFN-exocytosis-local-excerpt'],
+        'ISG-transcription':['host-ISG-nuclear-transcription-excerpt'],
+        'secretory-carrier':['host-secretory-vesicle-and-IFN-cargo'],
+        'released-IFN':['host-extracellular-released-IFN'],
+        'IFNAR-extracellular-assembly':['host-cell-surface-IFNAR-context','host-extracellular-IFN-bound-to-receptor-context'],
+        'IFNAR-cytosolic-JAK':['host-cell-surface-IFNAR-context','IFNAR-associated-cytosolic-kinase-schematic'],
+        'induced-products':['host-cytosolic-induced-gene-product-schematic']
+      };
+      if(key==='IRF3-transport')return name==='ActivatedIRF3TeachingDimer';
+      if(key==='STAT-transport')return name==='STAT1STAT2IRF9SelectedComplex';
+      if(key==='approaching-IFN')return name==='SelectedIFNBetaBindingIFNAR2'||role==='host-cell-surface-IFNAR-context';
+      return (roles[key]??[]).includes(role);
     }
     if(scope!=="whole"||!context.reactionCloseup)return true;
-    if(keys.includes("cytoskeleton")||keys.includes("transport-vesicles"))return false;
     const key=context.reactionKey??"";
-    if(/MAVS|IRF3|STAT|nuclear-transcription|cytosolic-recognition|secretory-carrier/.test(key)&&keys.includes("er")&&object.name!==NUCLEAR_ENVELOPE)return false;
-    if(key==="nuclear-transcription"&&keys.includes("nucleus")&&object.name!==NUCLEAR_ENVELOPE&&object.name!==NPC)return false;
-    return true;
+    // A classroom close-up retains the participating support, rather than
+    // looking through a stack of unrelated whole-cell organelles.
+    if(key==="MAVS")return keys.includes("mitochondria");
+    if(/IRF3|STAT/.test(key))return object.name===NPC;
+    if(key.startsWith("IFNAR-"))return keys.includes("membrane");
+    return false;
   }
   function bindDomains(object, mapping, scope) {
     if (domains.has(object)) return;
@@ -194,6 +224,10 @@ export function createAtlasVisibility({ container = null, whole = null, onBefore
         bind(object, SURFACE_PATCH_KEYS[object.userData.componentKey], scope);
       } else if (id === 'membrane-patch') {
         bind(object, /^GenericTransmembranePositionSymbol[12]$/.test(object.name) ? ['membrane-patch', 'membrane-proteins'] : ['membrane-patch'], scope);
+      } else if (id === 'phagosome' && object.name === FUSION_ENVELOPE) {
+        bindDomains(object, { 0: 'phagosome', 1: 'lysosome' }, scope);
+      } else if (id === 'phagosome' && (object.name === 'HydrolasesEnteringClosedPhagolysosome' || object.userData.organelleId === 'lysosome')) {
+        bind(object, ['phagosome', 'lysosome'], scope);
       } else if (id === 'golgi' && /GolgiTransportVesicle/.test(object.name)) {
         bind(object, ['golgi', 'transport-vesicles'], scope);
       } else if (id === 'cytoskeleton' && /TransportCargoVesicle/.test(object.name)) {
@@ -209,6 +243,13 @@ export function createAtlasVisibility({ container = null, whole = null, onBefore
     });
     syncMaterials();
     renderUI();
+  }
+  function unregisterDetail(model) {
+    if (!details.has(model)) return;
+    const members = new Set(); model.group.traverse(o => members.add(o));
+    for (const record of [...records.values()]) if (members.has(record.object)) removeRecord(record);
+    for (const domain of [...domains.values()]) if (members.has(domain.object)) removeDomain(domain);
+    details.delete(model);
   }
   function registerExternal(root, { key } = {}) {
     key = canonical(key); validateKeys([key]);
@@ -257,6 +298,13 @@ export function createAtlasVisibility({ container = null, whole = null, onBefore
       validateKeys(keys); return all(keys);
     }
     return false;
+  }
+  function canUseForFocus(object){
+    const record=records.get(object);
+    if(!record)return object.visible!==false;
+    // Camera selection ignores only the temporary classroom presentation gate;
+    // authored animation states and the user's semantic visibility still apply.
+    return record.gate.authored&&all(record.dependencies?.()??record.keys);
   }
   function syncMaterials() {
     for (const d of domains.values()) for (const b of d.bindings) if (b.sourceVersion !== b.source.version) {
@@ -351,5 +399,5 @@ export function createAtlasVisibility({ container = null, whole = null, onBefore
     details.clear(); scenarios.clear(); panel?.remove(); inputs.clear(); groupInputs.clear();
   }
   refreshWhole(); createUI();
-  return { registerDetail, registerExternal, registerScenario, canShowScenarioLabel, refreshWhole, syncMaterials, setContext, setHidden, setGroupHidden, restoreAll, isHidden: key => hidden.has(canonical(key)), isEffectivelyHidden: key => IDS.has(canonical(key)) && !allows(canonical(key)), canInspect: id => canInspectMask(id), canShowLabel: id => canShowMask(id), diagnostics, dispose };
+  return { registerDetail, unregisterDetail, registerExternal, registerScenario, canShowScenarioLabel, canUseForFocus, refreshWhole, syncMaterials, setContext, setHidden, setGroupHidden, restoreAll, isHidden: key => hidden.has(canonical(key)), isEffectivelyHidden: key => IDS.has(canonical(key)) && !allows(canonical(key)), canInspect: id => canInspectMask(id), canShowLabel: id => canShowMask(id), diagnostics, dispose };
 }

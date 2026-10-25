@@ -10,11 +10,13 @@ import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { createOrganelle, ORGANELLE_IDS } from "./organelle-models.js";
 import { createFusionLab, FUSION_IDS, FUSION_CATALOG } from "./fusion-lab.js";
 import { createDetailLearningControls } from "./detail-learning-controls.js";
+import { createExhibitionLayout } from "./exhibition-layout.js";
 import { createMolecularModel, MOLECULAR_IDS, MOLECULAR_CATALOG } from "./molecular-models.js";
 import { createMembranePatch } from "./membrane-patch.js";
 import {createCellSurfacePatch,CELL_SURFACE_PATCH_ID,CELL_SURFACE_PATCH_GUIDE} from "./cell-surface-patch.js";
 import { STRUCTURE_GUIDE as LEGACY_STRUCTURE_GUIDE, SCENARIO_GUIDE as LEGACY_SCENARIO_GUIDE } from "./structure-guide.js";
 import { createSteadyAtlas, STEADY_TOPICS, STEADY_GUIDE } from "./steady-atlas.js";
+import { createSteadyLessonControls } from "./steady-lesson-controls.js";
 const SCENARIO_GUIDE={...LEGACY_SCENARIO_GUIDE,structure:STEADY_GUIDE,get clearance(){return UPTAKE_GUIDES[state.uptakeCase??"particle-phagocytosis"];},get virus(){return {...LEGACY_SCENARIO_GUIDE.virus,steps:viralPhases.map(({name,desc})=>({title:name,desc}))};}};
 const STRUCTURE_GUIDE={...LEGACY_STRUCTURE_GUIDE,
 [CELL_SURFACE_PATCH_ID]:CELL_SURFACE_PATCH_GUIDE,
@@ -29,12 +31,16 @@ import {createAtlasSurfaceDetail} from "./atlas-surface-detail.js";
 import {createAtlasFocusDOF} from "./atlas-focus-dof.js";
 import {createReactionFocus} from "./reaction-focus.js";
 import {createSurfaceActivityControls} from "./surface-activity-controls.js";
-import {createCytoskeletonNetwork} from "./cytoskeleton-network.js";
+import {createCytoskeletonNetwork,CYTOSKELETON_SOURCES} from "./cytoskeleton-network.js";
 import {createCytoplasmMotion} from "./cytoplasm-motion.js";
 import {fitSmoothEROverview} from "./ser-overview-framing.js";
 import {createExplorationControls} from "./exploration-controls.js";
 import { createWholeAtlas } from "./whole-atlas.js";
 import { createViralAtlas, VIRAL_STAGES } from "./viral-atlas.js";
+import { createViralEntrySequence } from "./viral-entry-sequence.js";
+import { createClassroomOverlay } from "./classroom-overlay.js";
+import {createOrganelleContentOverlay} from './organelle-content-overlay.js';
+import { getResponseLesson } from "./classroom-response.js";
 import {createUptakeControls} from "./uptake-controls.js";
 import {UPTAKE_GUIDES} from "./uptake-guide.js";
 import membraneURL from "../assets/membrane-height.png";
@@ -58,12 +64,12 @@ const catalog = {
   golgi: { name: "高尔基体", color: "#e2a09b", summary: "层叠扁囊中的加工与分选站。剖开薄囊，观察出芽与运输囊泡。" },
   mitochondria: { name: "线粒体", color: "#d69262", summary: "双层膜包围的能量转换系统。进入基质，观察嵴膜和嵴颈。" },
   lysosome: { name: "溶酶体", color: "#a687b7", summary: "膜围成的降解腔。内部含水解酶和不同阶段的异质残余；形态可与成熟内体重叠。" },
-  endosome: { name: "内体", color: "#c7a668", summary: "摄取物的分选膜室。整胞展示分选管域、回收域与富含腔内小泡的成熟示例。" },
+  endosome: { name: "内体", color: "#779eab", summary: "内吞货物的分选区室。本例展示囊域与连续分选小管，腔内保留少量小囊泡。" },
   membrane: { name: "细胞膜", color: "#a0bcc8", summary: "磷脂双层边界。放大观察 FcγRIIA 结合和 P2X7 的 ATP 门控代表示例。" },
   cytoskeleton: { name: "细胞骨架", color: "#c8b688", summary: "微管、肌动蛋白与马达组成的动态网络。沿空心微管进入局部结构。" },
   pore: { name: "核孔复合体", color: "#998cba", summary: "贯通核内外的蛋白质通道。观察八重复支架与孔道的空间结构。" },
   phagosome: { name: "吞噬体", color: "#e3aa56", summary: "细胞膜包围摄取物形成的独立膜室。进入腔内，观察颗粒与成熟过程。" },
-  peroxisome: { name: "过氧化物酶体", color: "#86a794", summary: "单层膜包围的氧化代谢空间。观察内部酶性内容物和局部聚集体。" },
+  peroxisome: { name: "过氧化物酶体", color: "#95aa83", summary: "参与氧化代谢的单膜细胞器。椭球内分布细颗粒酶基质，不设通用晶核。" },
   ribosome: { name: "核糖体", color: "#c6a2a7", summary: "没有膜包围的翻译复合体。探索大、小亚基之间的空间与RNA链。" }
 };
 Object.assign(catalog,MOLECULAR_CATALOG);
@@ -72,14 +78,16 @@ catalog["membrane-patch"]={name:"柔软膜褶皱局部",color:"#9cb7bd",summary:
 catalog[CELL_SURFACE_PATCH_ID]={name:"微绒毛与膜活动",color:"#8eafb5",summary:CELL_SURFACE_PATCH_GUIDE.function};
 const LOCAL_IDS=[...MOLECULAR_IDS,...FUSION_IDS,"membrane-patch",CELL_SURFACE_PATCH_ID];
 const EXPLORABLE_IDS=[...ORGANELLE_IDS,...LOCAL_IDS];
+STRUCTURE_GUIDE.cytoskeleton={...STRUCTURE_GUIDE.cytoskeleton,sources:CYTOSKELETON_SOURCES};
 const phases = [{ name: "吞噬", at: 0, desc: "细胞膜包围颗粒，形成独立的吞噬体。" }, { name: "成熟", at: 0.38, desc: "吞噬体向细胞内部运输，与内体和溶酶体交换组分。" }, { name: "降解", at: 0.78, desc: "在膜围成的腔内，材料逐渐被水解酶分解。" }];
 const viralPhases = VIRAL_STAGES.map((stage,index) => ({ name: index===5?"自分泌 IFN 与基因应答":stage.title, at: stage.at, desc: index===5?"此例选择本细胞分泌的胞外 IFN-β 返回同一细胞：接合 IFNAR2，招募 IFNAR1 形成有限组装教学状态，再显示胞质 JAK 激活及 STAT / ISG 应答。距离与速度为教学放大，不表示所有病毒均被清除。":stage.desc }));
-const state = { view: "whole", selected: null, level: "whole", playing: false, speed: 1, section: 0.72, progress: 0, scenario: "structure", quality: "high", ambientTime:0, micro: false, patchSurface: false, following: false, viralFocused:false, viralFocusLabelId:null, connectedER: false, cameraHome: true, ready: false, time: 0 };
-let visibility=null,uptakeControls=null,reactionFocus=null,surfaceActivity=null,cytoskeletonNetwork=null,cytoplasmMotion=null,explorationControls=null,learningControls=null;
+const state = { view: "whole", selected: null, level: "whole", playing: false, speed: 1, section: 0.60, progress: 0, scenario: "structure", steadyTopic:0,steadyOverview:false, viralLesson:"entry", quality: "high", ambientTime:0, micro: false, patchSurface: false, following: false, viralFocused:false, viralFocusLabelId:null, connectedER: false, cameraHome: true, ready: false, time: 0 };
+let visibility=null,uptakeControls=null,reactionFocus=null,surfaceActivity=null,cytoskeletonNetwork=null,cytoplasmMotion=null,explorationControls=null,learningControls=null,exhibitionLayout=null,classroomOverlay=null,contentOverlay=null,steadyControls=null;
+let steadyLessonActive=false,steadyWholePose=null;
 const viralBoundaryNote=document.createElement("p");viralBoundaryNote.id="viral-boundary-note";viralBoundaryNote.className="process-boundary-note uptake-omission";viralBoundaryNote.hidden=true;$("phase-list").insertAdjacentElement("afterend",viralBoundaryNote);
-const viralBoundaryText=["胞外与已内化为分段状态；内陷与裂分省略。","内体腔内处理；此处不连接到胞质RNA。","独立条件：可识别RNA已经位于胞质。","宿主IRF3经核孔入核；不运输病毒颗粒。","ER后、Golgi后及释放后关键帧；出芽与融合省略。","自分泌示例：配体接合 → 两链靠拢 → 胞质 JAK 激活。形状与时序为教学表达。"];
+const viralBoundaryText=["胞外与已内化为分段状态；内陷与裂分省略。","内体腔内处理；此处不连接到胞质RNA。","独立条件：可识别RNA已经位于胞质；随后示意 MAVS / 下游激酶激活。","宿主 IRF3 经核孔入核，参与 IFNB1 转录；不运输病毒颗粒。","观察 mRNA 输出、ER 翻译、Golgi 腔内货物、运输与胞吐的局部教学视图；室间出芽与融合仍有省略。","自分泌示例：IFNAR 组装 → JAK / STAT 激活 → STAT 入核 → ISG 转录与产物。"];
 const visibilityReturnWaiters=[];
-let materialPreset = "conservative", surfaceDetail=null;
+let materialPreset = "exhibition", surfaceDetail=null;
 function configureMaterialGroup(group) {
   const result=materialPreset === "original" ? restoreAtlasMaterials(group) : applyAtlasMaterials(group, { preset: materialPreset });
   surfaceDetail?.apply(group);
@@ -99,7 +107,7 @@ const errors = [];
 window.addEventListener("error", (e) => errors.push(e.message));
 window.addEventListener("unhandledrejection", (e) => errors.push(String(e.reason)));
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(3, 3, 3);
+scene.background = new THREE.Color(3.9, 4.05, 4.3);
 function createRenderer() {
   try {
     return new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
@@ -118,7 +126,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.localClippingEnabled = true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.91;
+renderer.toneMappingExposure = 0.98;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 $("scene").append(renderer.domElement);
@@ -132,11 +140,11 @@ controls.maxDistance = 65;
 controls.addEventListener("change", requestRender);
 const pmrem = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment();
 scene.environment = pmrem.fromScene(room, 0.06).texture;
-scene.environmentIntensity = 0.38;
+scene.environmentIntensity = 0.42;
 room.dispose();
 pmrem.dispose();
-scene.add(new THREE.HemisphereLight("#ffffff", "#a8b5ce", 0.48));
-const key = new THREE.DirectionalLight("#ffffff", 2.1);
+scene.add(new THREE.HemisphereLight("#ffffff", "#c0cdd5", 0.58));
+const key = new THREE.DirectionalLight("#fff8ef", 2.6);
 key.position.set(-8, 13, 14);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
@@ -145,10 +153,10 @@ key.shadow.bias = -2e-4;
 key.shadow.normalBias = 8e-3;
 key.shadow.radius = 3;
 scene.add(key);
-const fill = new THREE.DirectionalLight("#d6e8f7", 0.48);
+const fill = new THREE.DirectionalLight("#dcecf7", 0.65);
 fill.position.set(9, 4, 8);
 scene.add(fill);
-const rim = new THREE.DirectionalLight("#ffdfbe", 0.95);
+const rim = new THREE.DirectionalLight("#ffdfbe", 0.85);
 rim.position.set(4, -3, -7);
 scene.add(rim);
 const loader = new THREE.TextureLoader(), surfaceTextures = {}, textureReadiness = [];
@@ -185,7 +193,7 @@ function prepareShadows(group) {
   group.traverse((o) => {
     if (!o.isMesh) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
-    o.castShadow = mats.every((m) => (!m.transparent || m.opacity > 0.95) && (m.transmission ?? 0) < 0.1);
+    o.castShadow = mats.every((m) => m.userData?.castsAnatomyShadow !== false && (!m.transparent || m.opacity > 0.95) && (m.transmission ?? 0) < 0.1);
     o.receiveShadow = true;
     for (const m of mats) m.clipShadows = true;
   });
@@ -200,6 +208,26 @@ const viral = createViralAtlas({ whole });
 configureMaterialGroup(viral.group);
 scene.add(viral.group);
 viral.group.visible = false;
+const viralEntry=createViralEntrySequence();
+prepareShadows(viralEntry.group);
+scene.add(viralEntry.group);
+viralEntry.group.visible=false;
+const isEntryLesson=()=>state.scenario==="virus"&&state.viralLesson==="entry"&&state.view==="whole";
+const viralLessonSnapshots={entry:{progress:0,time:0,section:.78},response:{progress:0,time:0,section:.60}};
+const isgPresentation={object:viral.group.getObjectByName("InducedISGAntiviralGeneProductsSchematic"),saved:null,planes:[new THREE.Plane(),new THREE.Plane(),new THREE.Plane(),new THREE.Plane(),new THREE.Plane(),new THREE.Plane()]};
+function updateClassroomISGWindow(){
+  const eligible=state.scenario==="virus"&&state.viralLesson==="response"&&state.view==="whole"&&state.userClearView&&state.viralFocusKind==="induced-products";
+  const d=eligible?reactionFocus?.diagnostics():null,show=eligible&&reactionFocus?.isActive()&&d?.key==="induced-products";
+  const object=isgPresentation.object,mats=Array.isArray(object.material)?object.material:[object.material];
+  if(show){
+    if(!isgPresentation.saved){isgPresentation.saved=mats.map(m=>m.clippingPlanes);for(const m of mats){m.clippingPlanes=isgPresentation.planes;m.needsUpdate=true;}}
+    const matrix=new THREE.Matrix4(),center=new THREE.Vector3();
+    object.getMatrixAt(d.representativeInstance,matrix);object.updateWorldMatrix(true,false);
+    center.setFromMatrixPosition(matrix).applyMatrix4(object.matrixWorld);
+    const r=.24,axes=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    isgPresentation.planes.forEach((plane,i)=>{plane.normal.fromArray(axes[i]);plane.constant=r-plane.normal.dot(center);});
+  }else if(isgPresentation.saved){mats.forEach((m,i)=>{m.clippingPlanes=isgPresentation.saved[i];m.needsUpdate=true;});isgPresentation.saved=null;}
+}
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), new THREE.ShadowMaterial({ opacity: 0.13, depthWrite: false }));
 ground.name = "ExhibitionSoftShadow";
 ground.rotation.x = -Math.PI / 2;
@@ -262,8 +290,18 @@ function clearOrbitMomentum() {
   controls.enableDamping = damping;
 }
 function wholePose() {
-  const { width, height } = measure(), ratio = width / height, v = THREE.MathUtils.degToRad(camera.fov * 0.5), margin = Math.max(0.7, 1 - 20 / Math.min(width, height)), halfAngle = Math.atan(Math.tan(v) * Math.min(1, ratio) * margin), fit = 0.99 * wholeFitRadius / Math.sin(halfAngle);
-  return { position: new THREE.Vector3(3.2, 4.2, fit), target: new THREE.Vector3(), near: 0.04, far: 110, minDistance: 9, maxDistance: fit * 2 };
+  const {width,height}=measure(),direction=new THREE.Vector3(.22,-.32,1).normalize(),target=new THREE.Vector3(0,-.08,0);
+  const right=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),direction).normalize(),up=new THREE.Vector3().crossVectors(direction,right),p=new THREE.Vector3();
+  const tan=Math.tan(THREE.MathUtils.degToRad(camera.fov*.5)),side=Math.max(.5,1-54/width),top=Math.max(.45,1-218/height),bottom=Math.max(.50,1-216/height);
+  let fit=0;
+  boundaryMesh.updateWorldMatrix(true,false);
+  for(let i=0;i<boundaryPositions.count;i++){
+    p.fromBufferAttribute(boundaryPositions,i).applyMatrix4(boundaryMesh.matrixWorld).sub(target);
+    const depth=p.dot(direction),vertical=p.dot(up);
+    fit=Math.max(fit,depth+Math.abs(p.dot(right))/(tan*(width/height)*side),depth+Math.abs(vertical)/(tan*(vertical>=0?top:bottom)));
+  }
+  fit*=1.015;
+  return {position:target.clone().addScaledVector(direction,fit),target,near:.04,far:110,minDistance:9,maxDistance:fit*2};
 }
 function currentPose() {
   return { position: camera.position.clone(), target: controls.target.clone(), near: camera.near, far: camera.far, minDistance: controls.minDistance, maxDistance: controls.maxDistance };
@@ -308,7 +346,10 @@ function computeDetailPose(direction = new THREE.Vector3(0.18, 0.13, 1)) {
   if(activeId === "membrane-patch") direction=new THREE.Vector3(1.3,1.6,1.5);
   if(activeId === CELL_SURFACE_PATCH_ID)direction=new THREE.Vector3(.75,-1.6,1.1);
   const scale = activeScale();
-  if (state.connectedER && state.level !== "surface") return { position: worldAnchor("connectionCamera"), target: worldAnchor("connectionTarget"), near: Math.max(1e-5, 1e-3 * scale), far: 110, minDistance: 0.025 * scale, maxDistance: 8 * scale };
+  if (state.connectedER && (state.erConnectionFocus || state.level === "inside")) {
+    const focus=state.erConnectionFocus?"connection":"lumen";
+    return {position:worldAnchor(focus+"Camera"),target:worldAnchor(focus+"Target"),near:Math.max(1e-5,1e-3*scale),far:110,minDistance:.025*scale,maxDistance:8*scale};
+  }
   const bounds = new THREE.Box3().setFromObject(active.group), center = bounds.getCenter(new THREE.Vector3()), dir = direction.clone().transformDirection(active.group.matrixWorld), right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize(), up = new THREE.Vector3().crossVectors(dir, right), { width, height } = measure();
   const verticalFraction = Math.max(0.55, (height - 150) / height), horizontalFraction = Math.max(0.65, (width - 100) / width), tan = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
   // Perspective edge inequalities are linear in each vertex. Use the actual
@@ -343,7 +384,9 @@ function resize() {
   focusDOF.resize(width,height,renderer.getPixelRatio());
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  if (state.view === "whole" && state.cameraHome) frameWhole();
+  if(steadyLessonActive)frameSteadyLesson();
+  else if (isEntryLesson())applyPose(entryLessonPose());
+  else if (state.view === "whole" && state.cameraHome) frameWhole();
 }
 function animatePose(position, target, duration = 0.95, options = {}) {
   clearOrbitMomentum();
@@ -362,14 +405,20 @@ function descendant(object, parent) {
 function loadDetail(id, connected) {
   const key2 = connected ? "er-connection" : id;
   let model = detailCache.get(key2);
+  if (id === 'phagosome' && model) {
+    surfaceDetail?.restore(model.group);
+    visibility?.unregisterDetail(model);
+    detailRoot.remove(model.group); detailBounds.delete(model); model.dispose();
+    detailCache.delete(key2); model = null;
+  }
   if (!model) {
-    model = FUSION_IDS.includes(id) ? createFusionLab({caseId:id,detail:true}) : id === CELL_SURFACE_PATCH_ID ? createCellSurfacePatch({detail:true}) : id === "membrane-patch" ? createMembranePatch({detail:true}) : MOLECULAR_IDS.includes(id) ? createMolecularModel(id,{detail:true}) : createOrganelle(id, { detail: true, connectedER: connected });
+    model = id === 'phagosome' ? whole.components.phagosome.createInspection({cloneMaterial:surfaceDetail?.cloneMaterial}) : FUSION_IDS.includes(id) ? createFusionLab({caseId:id,detail:true}) : id === CELL_SURFACE_PATCH_ID ? createCellSurfacePatch({detail:true}) : id === "membrane-patch" ? createMembranePatch({detail:true}) : MOLECULAR_IDS.includes(id) ? createMolecularModel(id,{detail:true}) : createOrganelle(id, { detail: true, connectedER: connected });
     if (connected) model.group.traverse((o) => {
       if (/Chromatin|Nucleolus|Nucleolar/.test(o.name)) o.visible = false;
     });
     model.group.updateMatrixWorld(true);
     detailBounds.set(model, new THREE.Box3().setFromObject(model.group));
-    if(model.metadata?.guide)STRUCTURE_GUIDE[id]=model.metadata.guide;
+    if(model.metadata?.guide){STRUCTURE_GUIDE[id]=model.metadata.guide;displayedGuide=null;}
     detailCache.set(key2, model);
     visibility?.registerDetail(model,{id,connectedER:connected});
     detailRoot.add(model.group);
@@ -377,6 +426,7 @@ function loadDetail(id, connected) {
     prepareShadows(model.group);
   }
   model.setObservationMode?.(false);
+  model.setObservationFocus?.(null);
   for (const [name, item] of detailCache) item.group.visible = name === key2;
   return model;
 }
@@ -390,7 +440,14 @@ function resolveWholeSource(id, hit, model, connected) {
     hit.object.getMatrixAt(hit.instanceId, instance);
     rawHitMatrix.multiply(instance);
   }
-  if (id === "pore") {
+  if (id === 'phagosome' && model.metadata?.sameWholeInstanceSnapshot) {
+    carrier = whole.components.phagosome.group;
+    sourceWorldMatrix = carrier.matrixWorld.clone(); matrix.copy(sourceWorldMatrix);
+    focus.copy(localCenter).applyMatrix4(matrix);
+    radius = localRadius * matrix.getMaxScaleOnAxis();
+    initialSection = model.initialSection;
+    kind = 'actual-phagosome-snapshot';
+  } else if (id === "pore") {
     let assembly = function(index) {
       const first = new THREE.Vector3(), middle = new THREE.Vector3(), last2 = new THREE.Vector3(), spoke = new THREE.Vector3(), all = [];
       let beadRadius = 0;
@@ -633,9 +690,16 @@ function captureHandoff(entering, onComplete) {
     }
   };
 }
-function viewModel(id, { connected = false, hit = null } = {}) {
+function viewModel(id, { connected = id === "er", hit = null } = {}) {
+  // The ER index and the actual surface now enter the same continuous
+  // nuclear-envelope/ER assembly; local views move the camera within it.
+  if(id === "er")connected=true;
   if (!catalog[id] || visibility && !visibility.canInspect(id)) return;
-  if(id==="cytoskeleton"&&state.view==="whole"&&visibility?.canShowLabel("intermediate-filaments")&&!visibility.canShowLabel("microtubules")&&!visibility.canShowLabel("actin")){explorationControls?.focusSkeleton("intermediate-filaments");return;}
+  if(isEntryLesson())setViralLesson("response",{focus:false});
+  if(id==='cytoskeleton'&&state.view==='whole'&&!navigation){
+    const key=['microtubules','actin','intermediate-filaments'].find(key=>visibility?.canShowLabel(key));
+    if(key){explorationControls?.focusSkeleton('network');return;}
+  }
   explorationControls?.leaveSkeleton();
   if(state.uptakeLocal&&!navigation)uptakeControls.setLocal(false);
   if (navigation) {
@@ -661,6 +725,7 @@ function viewModel(id, { connected = false, hit = null } = {}) {
     state.following = false;
     state.cameraHome = false;
     const useConnection = id === "er" && (connected || Boolean(hit));
+    state.erConnectionFocus=false;
     active = loadDetail(id, useConnection);
     activeId = id;
     const source = resolveWholeSource(id, hit, active, useConnection);
@@ -689,12 +754,13 @@ function viewModel(id, { connected = false, hit = null } = {}) {
       captureHandoff(true, () => {
         navigationPhase("detail-focus");
         const fromSection = source.initialSection;
-        state.section = MOLECULAR_IDS.includes(id)?0:0.78;
+        state.section = id === 'phagosome' ? source.initialSection : MOLECULAR_IDS.includes(id)||state.connectedER?0:0.78;
+        if(state.connectedER)state.level="surface";
         if (state.connectedER) microTextureScale(6);
         const pose = computeDetailPose();
         syncUI();
         animatePose(pose.position, pose.target, 0.45, { pose, arc: true, sectionFrom: fromSection, sectionTo: state.section, onComplete() {
-          $("status").textContent = LOCAL_IDS.includes(id) ? "已放大" + catalog[id].name + "的代表性实例，可继续观察局部构象。" : "已从原位接近" + catalog[id].name + "，可继续进入内部构象。";
+          $("status").textContent = LOCAL_IDS.includes(id) ? "已放大" + catalog[id].name + "的代表性实例，可继续观察局部构象。" : "已放大" + catalog[id].name + "，可拖动旋转并调整剖切。";
           navigationDone("detail-idle");
         } });
       });
@@ -716,8 +782,11 @@ function setLevel(level) {
     state.micro = false;
     state.patchSurface=false;
     state.level = level;
+    state.erConnectionFocus=false;
     state.view = "detail";
     state.section = level === "surface" ? 0 : level === "section" || state.selected === "membrane" ? 0.78 : MOLECULAR_IDS.includes(state.selected)?0:0.8;
+    active.setObservationFocus?.(state.connectedER && level === "inside" ? "er-lumen" : null);
+    if (state.connectedER && level === "inside") state.section = .78;
     if (state.connectedER && level !== "surface") microTextureScale(6);
     const pose = computeDetailPose(level === "inside" ? new THREE.Vector3(0.36, 0.2, 1) : new THREE.Vector3(0.18, 0.13, 1));
     animatePose(pose.position, pose.target, 0.65, { pose, arc: true, sectionFrom: fromSection, sectionTo: state.section });
@@ -750,6 +819,7 @@ function toggleMicro() {
     return;
   }
   if (!active || state.level !== "inside") return;
+  if (state.connectedER) { setLevel("inside"); return; }
   if(!state.micro && !microTargetVisible())return;
   if (state.micro) {
     setLevel("inside");
@@ -839,7 +909,9 @@ function returnWhole() {
   }
 }
 function reset() {
+  if(steadyLessonActive&&!navigation){transition=null;frameSteadyLesson();syncUI();return;}
   explorationControls?.leaveSkeleton();
+  if(isEntryLesson()&&!navigation){transition=null;applyPose(entryLessonPose());syncUI();return;}
   if(state.scenario==="clearance"&&state.uptakeLocal&&!navigation&&state.view==="whole"){uptakeControls.focusCamera(false);syncUI();return;}
   if (navigation) {
     pendingCommand = { type: "reset" };
@@ -900,7 +972,12 @@ function renderStructureGuide(id, connected = false) {
   guideSources(host, guide.sources);
 }
 function renderScenarioGuide() {
-  const guide = SCENARIO_GUIDE[state.scenario], host = $("scenario-guide-content");
+  const guide = state.scenario==="virus"&&state.viralLesson==="entry"?{
+    summary:viralEntry.getState().generalPrinciple,
+    steps:viralEntry.stages,
+    notes:["本例从病毒已经位于内体腔内开始。HA 和低 pH 触发仅对应流感病毒示例；其他包膜病毒的受体、触发与融合位置可不同。","上方为病毒内部，两层膜之间为内体腔，下方为胞质。青绿球只是水相连通示踪，不是病毒 RNA；融合不等于有效感染。"],
+    sources:[{title:"Benton et al. 2020 · HA 构象中间态",url:"https://www.nature.com/articles/s41586-020-2333-6"},{title:"Calder & Rosenthal · 膜融合电镜",url:"https://pmc.ncbi.nlm.nih.gov/articles/PMC6485592/"}]
+  }:SCENARIO_GUIDE[state.scenario], host = $("scenario-guide-content");
   host.replaceChildren();
   $("scenario-details").open = false;
   if (!guide) return;
@@ -954,6 +1031,8 @@ function syncUI() {
   requestRender();
   $("follow-button").innerHTML = (state.scenario === "structure" ? "观察协作运输" : state.scenario === "virus" ? "靠近当前反应" : state.following ? "返回整胞视角" : "跟随颗粒") + icon(state.following ? "back" : "arrow");
   const detail = state.view === "detail";
+  const entry=isEntryLesson();
+  $("particle-key").hidden=detail||state.scenario==="virus"||Boolean(state.uptakeLocal)||Boolean(state.skeletonFocus);
   updateMembraneActivityStatus();
   $("play-button").disabled = Boolean(navigation);
   $("time-range").disabled = Boolean(navigation) || detail;
@@ -962,19 +1041,32 @@ function syncUI() {
   $("connection-button").disabled = Boolean(navigation);
   $("smooth-er-button").hidden=!detail||activeId!=="er"||!active?.anchors.smoothERCamera;
   $("smooth-er-button").disabled=Boolean(navigation);
-  $("enter-button").disabled = Boolean(navigation);
+
   $("micro-button").disabled = Boolean(navigation)||!microTargetVisible();
   $("micro-button").title=microTargetVisible()?"":"恢复显示对应微管、肌动蛋白芯或膜蛋白示意后观察此局部";
   $("surface-motion-button").disabled = Boolean(navigation) || !surfaceTargetVisible();
   $("surface-motion-button").title = surfaceTargetVisible() ? "" : "恢复显示局部膜和膜蛋白示意后观察";
-  document.querySelectorAll("[data-level]").forEach((button) => button.disabled = Boolean(navigation));
-  ground.visible = !detail;
-  viral.group.visible = !detail && state.scenario === "virus";
-  viralBoundaryNote.hidden=detail||state.scenario!=="virus";
+
+  ground.visible = !detail&&!entry&&!state.uptakeLocal;
+  viral.group.visible = !detail && state.scenario === "virus"&&!entry;
+  viralEntry.group.visible=entry;
+  if(state.view==="whole"&&!navigation&&!state.uptakeLocal)whole.group.visible=!entry;
+  viralBoundaryNote.hidden=detail||state.scenario!=="virus"||entry;
+  $("viral-lesson-selector").hidden=detail||state.scenario!=="virus";
+  document.querySelectorAll("[data-viral-lesson]").forEach(b=>{b.setAttribute("aria-pressed",String(b.dataset.viralLesson===state.viralLesson));b.disabled=Boolean(navigation);});
   document.body.classList.toggle("virus-mode", state.scenario === "virus");
   document.body.classList.toggle("structure-mode",state.scenario === "structure");
-  steady.group.visible=!detail&&state.scenario === "structure";
-  if(cytoskeletonNetwork)cytoskeletonNetwork.group.visible=Boolean(state.showSkeletonNetwork)&&!detail&&!state.uptakeLocal&&state.scenario!=="clearance";
+  steady.group.visible=false;
+  if(cytoskeletonNetwork){
+    cytoskeletonNetwork.group.visible=Boolean(state.showSkeletonNetwork)&&!detail&&!state.uptakeLocal&&state.scenario!=="clearance"&&!entry;
+    const focused=Boolean(state.skeletonFocus),materials=new Set();
+    cytoskeletonNetwork.group.traverse(o=>{if(!o.isMesh)return;o.userData.exhibitionCastShadow??=o.castShadow;o.castShadow=focused?o.userData.exhibitionCastShadow:false;for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m);});
+    for(const m of materials){m.userData.exhibitionOpacity??={opacity:m.opacity,transparent:m.transparent,depthWrite:m.depthWrite};const base=m.userData.exhibitionOpacity;
+      // Four visible walls can accumulate alpha in a hollow, double-sided tube.
+      // Keep the overview network quiet; a focused view restores its solid form.
+      m.opacity=focused?base.opacity:base.opacity*.05;m.transparent=focused?base.transparent:true;m.depthWrite=focused?base.depthWrite:false;
+    }
+  }
   $("structure-tab").setAttribute("aria-pressed",String(state.scenario === "structure"));
   $("mode-status").textContent=state.scenario === "structure" ? "结构 · 功能 · 日常协作" : state.scenario === "clearance" ? "摄取 · 成熟 · 处理的概念演示" : "条件性应答示意 · 摄取不等于感染";
   $("follow-button").hidden=false;
@@ -1000,8 +1092,8 @@ function syncUI() {
   $("speed-select").value = String(state.speed);
   $("clearance-tab").setAttribute("aria-pressed", String(state.scenario === "clearance"));
   $("virus-tab").setAttribute("aria-pressed", String(state.scenario === "virus"));
-  $("subtitle").textContent = detail ? `${catalog[state.selected].name} · ${state.level === "inside" ? "内部构象" : state.level === "surface" ? "完整结构" : "剖面观察"}` : "旋转整颗细胞，发现生命内部的联系";
-  $("view-hint").textContent = detail ? state.level === "inside" ? "正在内部构象 · 拖动环视 · 滚轮调整 · Esc返回整胞" : "拖动旋转 · 滚轮放大 · 选择内部构象继续深入" : "拖动旋转 · 滚轮缩放 · 点击细胞器探索";
+  $("subtitle").textContent = detail ? `${catalog[state.selected].name} · 局部观察` : "旋转整颗细胞，发现生命内部的联系";
+  $("view-hint").textContent = detail ? "拖动旋转 · 滚轮缩放 · 调整剖切 · Esc 返回整胞" : "拖动旋转 · 滚轮缩放 · 点击细胞器探索";
   for (const el of document.querySelectorAll(".organelle-button")) el.classList.toggle("active", el.dataset.organelle === state.selected);
   $("surface-motion-button").hidden=!detail||!["membrane-patch",CELL_SURFACE_PATCH_ID].includes(state.selected);
   $("surface-patch-button").hidden=!detail||state.selected!=="membrane";
@@ -1010,10 +1102,10 @@ function syncUI() {
     const c = catalog[state.selected];
     $("detail-title").textContent = state.connectedER ? "核膜与内质网" : c.name;
     $("connection-button").hidden = state.selected !== "er";
-    $("connection-button").textContent = state.connectedER ? "返回内质网整体" : "观察核膜连接";
+    $("connection-button").textContent = state.erConnectionFocus ? "返回内质网全貌" : "观察核膜连接";
     $("detail-summary").textContent = STRUCTURE_GUIDE[state.selected]?.function ?? c.summary;
     renderStructureGuide(state.selected, state.connectedER);
-    $("detail-kicker").textContent = state.connectedER ? "连接局部 · 共同膜腔" : state.level === "inside" ? "深入生命 · 内部构象" : "细胞器 · 结构观察";
+    $("detail-kicker").textContent = state.connectedER ? "核膜与内质网 · 连续膜腔" : "细胞器 · 局部观察";
     $("fact-list").replaceChildren();
     const guide = STRUCTURE_GUIDE[state.selected];
     const quickFacts = guide ? ["位置：" + guide.location, "协作：" + guide.partners.join("、")] : active.facts.slice(0, 3);
@@ -1022,9 +1114,9 @@ function syncUI() {
       li.textContent = fact;
       $("fact-list").append(li);
     }
-    for (const el of document.querySelectorAll("[data-level]")) el.classList.toggle("active", el.dataset.level === state.level);
-    $("enter-button").innerHTML = (state.level === "inside" ? "返回剖面观察" : "进入内部构象") + icon("arrow");
-    $("micro-button").hidden = state.level !== "inside";
+
+
+    $("micro-button").hidden = state.level !== "inside" || state.connectedER || !["membrane","pore","cytoskeleton","ribosome","membrane-patch",CELL_SURFACE_PATCH_ID,...MOLECULAR_IDS,...FUSION_IDS].includes(state.selected);
     $("micro-button").textContent = state.micro ? "返回构象总览" : MOLECULAR_IDS.includes(state.selected) ? catalog[state.selected].microLabel : state.selected === CELL_SURFACE_PATCH_ID ? "观察微绒毛胞质侧与芯" : state.selected === "ribosome" ? "观察亚基界面" : state.selected === "cytoskeleton" ? "深入微管局部" : state.selected === "membrane" ? "观察双层局部" : state.selected === "pore" ? "进入核孔通道" : "进入腔内漫游";
     $("surface-motion-button").hidden=!["membrane-patch",CELL_SURFACE_PATCH_ID].includes(state.selected);
     $("inside-note").hidden = state.level !== "inside";
@@ -1055,21 +1147,121 @@ function syncUI() {
   }
   learningControls?.sync();
   syncPhase();
-  $("follow-button").disabled=state.scenario === "structure"&&!steady.activityFocus(state.ambientTime);
+  $("follow-button").disabled=Boolean(navigation);
   uptakeControls?.renderUI();
-  if(state.scenario === "virus"){$("follow-button").disabled=Boolean(navigation)||!reactionFocus?.canFocus();if(isReceptorFocus()&&state.viralFocusKind?.startsWith("IFNAR-"))$("follow-button").innerHTML=(state.viralSurfaceSide==="inside"?"查看膜外结合面":"查看胞质侧激活")+icon("arrow");}
+  if(state.scenario === "virus"){$("follow-button").disabled=Boolean(navigation)||(!entry&&!reactionFocus?.canFocus());if(entry)$("follow-button").innerHTML="重置融合视角"+icon("reset");else if(isReceptorFocus()&&state.viralFocusKind?.startsWith("IFNAR-"))$("follow-button").innerHTML=(state.viralSurfaceSide==="inside"?"查看膜外结合面":"查看胞质侧激活")+icon("arrow");}
   visibility?.setContext({view:state.view,selected:state.selected,connectedER:state.connectedER,surfaceReceptorFocus:state.userClearView&&isReceptorFocus(),reactionCloseup:Boolean(state.userClearView&&reactionFocus?.isActive()),reactionKey:state.viralFocusKind,skeletonFocus:state.userClearView?state.skeletonFocus:null});
   if(reactionFocus?.isActive()){const names={"particle":"摄取颗粒","endosomal-processing":"内体腔内处理","cytosolic-recognition":"胞质 RNA 与 RIG-I","MAVS":"线粒体外膜 · MAVS","IRF3-transport":"IRF3 · 经核孔入核","nuclear-transcription":"核内 IFNB1 转录","secretory-carrier":"IFN-β 分泌载体","released-IFN":"释放后的 IFN-β","approaching-IFN":"IFN-β · 接近细胞表面","STAT-transport":"STAT · 经核孔入核","induced-products":"胞质 · 一个代表性 ISG 产物"};$("subtitle").textContent=isReceptorFocus()?(state.viralSurfaceSide==="inside"?"IFNAR · 胞质侧 JAK 激活":"IFNAR · 膜外配体结合"):(names[state.viralFocusKind]??"当前反应 · 跟随观察");$("view-hint").textContent="随实际对象移动 · "+(state.userClearView?"清晰观察已开 · ":"")+"拖动/滚轮接管 · 重置返回整胞";}
   for(const b of document.querySelectorAll("[data-organelle]"))b.disabled=Boolean(visibility&&!visibility.canInspect(b.dataset.organelle));
+  if(state.viralFocused){const names={'TBK1-activation':'胞质侧 · TBK1 与 IRF3 活化','mRNA-to-ER':'IFNB1 mRNA · 输出与接入翻译','ER-translation':'粗面内质网 · 合成 IFN-β','Golgi-processing':'高尔基体 · 腔内处理与分选',exocytosis:'宿主分泌 · 开放胞吐孔','ISG-transcription':'细胞核 · 宿主 ISG 转录'};if(names[state.viralFocusKind])$('subtitle').textContent=names[state.viralFocusKind];}
   if(state.selected === "er" && visibility?.isHidden("nucleus")){$("connection-button").disabled=true;$("connection-button").title="恢复显示细胞核后观察连接";}
   surfaceActivity?.sync();explorationControls?.sync();
   annotations?.update({ view: state.view, selected: state.selected, connectedER: state.connectedER, scenario: state.scenario });
   if (annotations && !annotations.visible) $("callouts").hidden = true;
+  if(state.scenario==="virus"&&!detail)$("callouts").hidden=true;
+  document.body.classList.toggle("entry-lesson-mode",entry);
+  if(entry){$("subtitle").textContent="包膜病毒的一般融合原理 · 以流感病毒 HA 为例";$("view-hint").textContent="上：病毒内部 · 间隙：内体腔 · 下：胞质｜选择阶段看蛋白重排与开孔";}
+  classroomOverlay?.update();
+  exhibitionLayout?.sync();
+}
+function frameSteadyLesson(){
+  const pose=steady.getCameraPose(),offset=pose.position.clone().sub(pose.target);
+  // Leave room for annotation rails while fitting the teaching excerpt on a laptop.
+  pose.position.copy(pose.target).addScaledVector(offset,Math.max(1,1.22/Math.max(.5,camera.aspect)));
+  applyPose(pose);state.cameraHome=false;
+}
+function syncSteadyContext({category,detailView}){
+  const activeLesson=category==='processes'&&state.scenario==='structure'&&!detailView&&!state.steadyOverview&&!navigation;
+  if(activeLesson&&!steadyLessonActive){
+    steadyWholePose=currentPose();transition=null;clearOrbitMomentum();
+    steadyLessonActive=true;steady.setTopic(state.steadyTopic);steady.seek(state.progress);frameSteadyLesson();
+  }else if(!activeLesson&&steadyLessonActive){
+    steadyLessonActive=false;transition=null;
+    if(state.view==='whole'&&state.scenario==='structure'){
+      if(steadyWholePose)applyPose(steadyWholePose);else frameWhole();
+      whole.group.visible=true;ground.visible=true;
+      if(cytoskeletonNetwork)cytoskeletonNetwork.group.visible=Boolean(state.showSkeletonNetwork);
+      $("callouts").hidden=Boolean(annotations&&!annotations.visible);
+    }
+    steadyWholePose=null;
+  }
+  steady.group.visible=activeLesson&&Boolean(visibility?.canShowLabel('collaboration')??true);
+  if(activeLesson){
+    $("visibility-details").hidden=true;
+    whole.group.visible=false;ground.visible=false;viral.group.visible=false;viralEntry.group.visible=false;
+    if(cytoskeletonNetwork)cytoskeletonNetwork.group.visible=false;
+    $("callouts").hidden=true;$("particle-key").hidden=true;
+    $("subtitle").textContent=STEADY_TOPICS[state.steadyTopic].name+' · 局部教学展开 · '+['追踪橙色分泌货物','看清轨道、马达与载体','区分膜受体和腔内货物'][state.steadyTopic];
+    $("view-hint").textContent='局部协作示意 · 空间与尺度为教学展开｜选择步骤或播放 · 拖动环视';
+    $("section-range").disabled=true;
+  }
+  if(state.scenario==='structure'&&!detailView){
+    $("follow-button").innerHTML=(state.steadyOverview?'返回协作演示':'查看整胞位置')+icon(state.steadyOverview?'back':'arrow');
+    document.querySelector('.time-control').hidden=!activeLesson;
+    $("relationship-note").hidden=activeLesson;
+  }
+  document.body.classList.toggle('steady-lesson-active',activeLesson);
+  steadyControls?.sync(activeLesson);requestRender();
+}
+function seekSteadyStep(index){
+  if(navigation||!steadyLessonActive)return;
+  const i=THREE.MathUtils.clamp(index,0,4);seekTeachingProgress((i+.5)/5);
+}
+function entryLessonPose(){
+  const pose=viralEntry.getCameraPose(),offset=pose.position.clone().sub(pose.target);
+  const right=new THREE.Vector3().crossVectors(camera.up,offset).normalize();
+  pose.target.addScaledVector(right,-.62);
+  pose.position.copy(pose.target).addScaledVector(offset,1.42);
+  return pose;
+}
+function seekTeachingProgress(progress,{focus=true}={}){
+  state.progress=THREE.MathUtils.clamp(progress,0,1);state.playing=false;
+  if(state.scenario==='structure')steady.seek(state.progress);
+  if(state.scenario==="virus"){
+    if(state.viralLesson==="entry")viralEntry.seek(state.progress);
+    else {viral.seek(state.progress);reactionFocus?.timelineChanged("seek");if(focus)reactionFocus?.focus();}
+  }
+  syncUI();
+}
+function seekTeachingStage(index){
+  const list=presentationPhases(),i=THREE.MathUtils.clamp(index,0,list.length-1),p=list[i];
+  if(state.scenario==='structure'){
+    state.steadyTopic=i;state.steadyOverview=false;steady.setTopic(i);phaseIndex=-1;
+    seekTeachingProgress(0);return;
+  }
+  const progress=state.scenario==="virus"&&state.viralLesson==="response"&&i===5?.855:p.at+((list[i+1]?.at??1)-p.at)*.45;
+  seekTeachingProgress(progress);
+}
+function setViralLesson(lesson,{focus=true}={}){
+  if(!["entry","response"].includes(lesson)||navigation||state.view!=="whole")return;
+  viralLessonSnapshots[state.viralLesson]={progress:state.progress,time:state.time,section:state.section};
+  reactionFocus?.leave("lesson-change");transition=null;clearOrbitMomentum();
+  state.viralLesson=lesson;Object.assign(state,viralLessonSnapshots[lesson]);state.playing=false;state.following=false;
+  // Restore the selected lesson's actor visibility before the focus controller
+  // validates actual rendered objects.
+  syncUI();
+  if(lesson==="entry"){viralEntry.seek(state.progress);viralEntry.setSection(state.section);applyPose(entryLessonPose());}
+  else {state.userClearView=true;whole.setSection(state.section);viral.seek(state.progress);if(!focus||!reactionFocus?.focus())frameWhole();}
+  setupPhases();
+}
+function classroomLesson(){
+  if(state.scenario!=="virus"||state.view!=="whole"||navigation||annotations&&!annotations.visible)return null;
+  if(state.viralLesson==="entry"){
+    const s=viralEntry.getState();
+    return {key:"entry",index:s.stageIndex,total:viralEntry.stages.length,title:s.stage.title,subtitle:s.subtitle,location:s.location,instruction:s.instruction,boundaryNote:"上：病毒内部 · 间隙：内体腔 · 下：胞质。青绿球仅示踪水相；低 pH 为本例触发条件。",labels:viralEntry.getTeachingLabels(),stages:viralEntry.stages};
+  }
+  return getResponseLesson({THREE,state,viral,reactionFocus,stages:viralPhases});
+}
+function presentationPhases() {
+  if(state.scenario === "structure")return STEADY_TOPICS;
+  if(state.scenario === "virus")return state.viralLesson==="entry"?viralEntry.stages.map(s=>({...s,name:s.title})):viralPhases;
+  return uptakeControls?.stages()??phases;
 }
 function syncPhase() {
+  if(state.scenario==='structure')steady.seek(state.progress);
   $("time-range").value = Math.round(state.progress * 1e3);
   $("time-value").textContent = Math.round(state.progress * 100) + "%";
-  const list = state.scenario === "structure" ? STEADY_TOPICS : state.scenario === "virus" ? viralPhases : uptakeControls?.stages()??phases, index = list.reduce((a, v, i) => state.progress >= v.at ? i : a, 0);
+  const list = presentationPhases(), index = state.scenario==='structure'?state.steadyTopic:list.reduce((a, v, i) => state.progress >= v.at ? i : a, 0);
   if (index !== phaseIndex) {
     phaseIndex = index;
     if (annotations?.diagnostics().note?.kind === "scenario") annotations.close();
@@ -1078,30 +1270,29 @@ function syncPhase() {
       el.setAttribute("aria-current", i === index ? "step" : "false");
     });
     $("phase-description").textContent = list[index].desc;
-    if(state.scenario === "virus")viralBoundaryNote.textContent=viralBoundaryText[index];
-    if(state.scenario === "structure"){steady.setTopic(index);$("steady-description").textContent=list[index].desc;}
+    if(state.scenario === "virus"&&state.viralLesson!=="entry")viralBoundaryNote.textContent=viralBoundaryText[index];
+    if(state.scenario === "structure"){steady.setTopic(index);steady.seek(state.progress);$("steady-description").textContent=list[index].desc;}
     if(state.scenario === "clearance")uptakeControls?.renderUI();
   }
+  if(state.scenario==='structure')steadyControls?.sync(steadyLessonActive);
 }
 function setupPhases() {
   renderScenarioGuide();
   phaseIndex = -1;
   $("phase-list").replaceChildren();
-  const list = state.scenario === "structure" ? STEADY_TOPICS : state.scenario === "virus" ? viralPhases : uptakeControls?.stages()??phases;
-  $("journey-heading").textContent = state.scenario === "structure" ? "日常协作的细胞" : state.scenario === "virus" ? "细胞的抗病毒应答" : "一颗颗粒的旅程";
+  const list = presentationPhases();
+  $("journey-heading").textContent = state.scenario === "structure" ? "日常协作的细胞" : state.scenario === "virus" ? state.viralLesson==="entry"?"包膜病毒的膜融合":"细胞的抗病毒应答" : "一颗颗粒的旅程";
   $("follow-button").innerHTML = (state.scenario === "structure" ? "观察协作运输" : state.scenario === "virus" ? "靠近当前反应" : state.following ? "返回整胞视角" : "跟随颗粒") + icon(state.following ? "back" : "arrow");
   for (const [i, p] of list.entries()) {
     const b = document.createElement("button");
     b.className = "phase-button";
     b.dataset.phase = i;
+    b.dataset.stepNumber = String(i+1).padStart(2,'0');
     b.innerHTML = '<span class="phase-node" aria-hidden="true"></span><span></span>';
     b.children[1].textContent = p.name;
     b.addEventListener("click", () => {
       if (navigation || state.view === "detail") return;
-      state.progress = state.scenario === "virus"&&i===5 ? .839 : state.scenario !== "structure" ? p.at + ((list[i + 1]?.at ?? 1) - p.at) * 0.45 : p.at;
-      state.playing = false;
-      if (state.scenario === "virus"){viral.seek?.(state.progress);reactionFocus?.timelineChanged("stage");}
-      syncUI();
+      seekTeachingStage(i);
     });
     $("phase-list").append(b);
   }
@@ -1121,13 +1312,22 @@ function switchScenario(mode) {
   if(state.scenario === "clearance")uptakeControls?.leave();
   reactionFocus?.leave("scenario");state.viralFocused=false;state.viralFocusLabelId=null;
   state.scenario = mode;
+  if(mode==='structure'){state.steadyOverview=false;steady.setTopic(state.steadyTopic);steady.seek(0);}
   state.progress = mode === "structure" || mode === "virus" ? 0 : 0.38;
   state.playing = false;
   viral.seek?.(0);
   viral.resetTime?.(0);
   returnWhole();
-  if(mode === "clearance")uptakeControls?.enter();
+  if(mode === "clearance"){
+    uptakeControls?.enter();
+  }
   setupPhases();
+  if(mode==="virus"){
+    state.section=viralLessonSnapshots[state.viralLesson].section;
+    if(state.viralLesson==="entry"){viralEntry.seek(0);viralEntry.setSection(state.section);applyPose(entryLessonPose());}
+    else {state.userClearView=true;whole.setSection(state.section);reactionFocus?.focus();}
+    syncUI();
+  }
 }
 for (const id of EXPLORABLE_IDS) {
   const c = catalog[id], b = document.createElement("button");
@@ -1225,7 +1425,7 @@ function updateCallouts() {
     previous = { x, y };
   }
   for (const b of document.querySelectorAll("[data-callout]")) {
-    if (state.scenario === "virus" || state.userClearView&&state.skeletonFocus || visibility&&!visibility.canShowLabel(b.dataset.callout)) {
+    if (state.scenario === "virus" || state.section === 0 && (visibility?.canShowLabel("membrane") ?? true) || state.userClearView&&state.skeletonFocus || visibility&&!visibility.canShowLabel(b.dataset.callout)) {
       b.hidden = true;
       continue;
     }
@@ -1262,15 +1462,23 @@ surfaceDetail.apply(whole.group);surfaceDetail.apply(viral.group);
 uptakeControls=createUptakeControls({state,scene,whole,camera,controls,renderer,visibility,configureMaterialGroup,prepareShadows,requestRender,animatePose,cancelTransition:()=>{transition=null;clearOrbitMomentum();},isAnnotationsVisible:()=>annotations?.visible??true,isNavigating:()=>Boolean(navigation),frameWhole,syncUI,setupPhases});
 const originalWholeSetSection=whole.setSection;
 whole.setSection=(...args)=>{const result=originalWholeSetSection(...args);visibility.refreshWhole();return result;};
-reactionFocus=createReactionFocus({THREE,state,viral,whole,camera,controls,canShow:id=>visibility.canShowLabel(id),isNavigating:()=>Boolean(navigation),isTransitioning:()=>Boolean(transition),animate:(pose,options)=>animatePose(pose.position,pose.target,options.duration,{pose,arc:options.arc}),cancelTransition:()=>{transition=null;clearOrbitMomentum();},requestRender,onChange:()=>syncUI()});
+reactionFocus=createReactionFocus({THREE,state,viral,whole,camera,controls,canShow:id=>visibility.canShowLabel(id),canUseActor:object=>visibility.canUseForFocus(object),isNavigating:()=>Boolean(navigation),isTransitioning:()=>Boolean(transition),animate:(pose,options)=>animatePose(pose.position,pose.target,options.duration,{pose,arc:options.arc}),cancelTransition:()=>{transition=null;clearOrbitMomentum();},requestRender,onChange:()=>syncUI()});
+classroomOverlay=createClassroomOverlay({THREE,container:document.querySelector(".atlas"),camera,measure,getLesson:classroomLesson,onSeekStage:seekTeachingStage,onSeekSubstep:index=>{const steps=viral.getTeachingSteps(),step=steps[index];if(step)seekTeachingProgress(step.at+((steps[index+1]?.at??1)-step.at)*.45);}});
+contentOverlay=createOrganelleContentOverlay({THREE,container:document.querySelector('.atlas'),camera,measure,getContext:()=>({model:active,visible:state.view==='detail'&&!navigation&&(!state.micro||state.selected==='membrane')&&(annotations?.visible??true)})});
+$("journey-heading").before($("viral-lesson-selector"));
+document.querySelectorAll("[data-viral-lesson]").forEach(b=>b.addEventListener("click",()=>setViralLesson(b.dataset.viralLesson)));
 annotations = createAtlasAnnotations({ sidebar: document.querySelector(".sidebar"), footer: document.querySelector(".sidebar-footer"), guides: STRUCTURE_GUIDE, scenarios: SCENARIO_GUIDE, canShowPart: id => visibility?.canShowLabel(id) ?? true, onInspect: (id) => viewModel(id), onChange: () => syncUI() });
-for (const button of document.querySelectorAll("[data-annotation-id]")) annotations.bindLabel(button, { id: button.dataset.annotationId });
+for (const button of document.querySelectorAll("[data-annotation-id]")) button.addEventListener("click",()=>viewModel(button.dataset.annotationId));
 const connectionFeatureIndex = STRUCTURE_GUIDE.er.features.findIndex((feature) => feature.name.includes("核周隙"));
 for (const { el } of connectionCallouts) annotations.bindLabel(el.lastChild, { id: "er", featureIndex: connectionFeatureIndex });
-$("connection-button").addEventListener("click", () => viewModel("er", { connected: !state.connectedER }));
+$("connection-button").addEventListener("click", () => {
+  if(navigation||activeId!=="er")return;
+  state.erConnectionFocus=!state.erConnectionFocus;state.level="surface";state.micro=false;state.section=0;active.setObservationFocus?.(null);active.setSection(0);microTextureScale(false);
+  fitDetail(new THREE.Vector3(.18,.13,1),true);syncUI();
+});
 $("smooth-er-button").addEventListener("click",()=>{
   if(navigation||activeId!=="er"||!active?.anchors.smoothERCamera)return;
-  active.setObservationMode?.(false);microTextureScale(false);const fromSection=active.group.userData.section??state.section;
+  active.setObservationMode?.(false);active.setObservationFocus?.(null);state.erConnectionFocus=false;microTextureScale(false);const fromSection=active.group.userData.section??state.section;
   state.level="surface";state.micro=false;state.patchSurface=false;state.section=0;
   const wall=active.group.getObjectByName(state.connectedER?"PerforatedDoubleNuclearMembrane":"OneContinuousFoldedERMembrane");
   const {width,height}=measure(),framing=fitSmoothEROverview({mesh:wall,connectedER:state.connectedER,camera,width,height});
@@ -1280,22 +1488,28 @@ $("smooth-er-button").addEventListener("click",()=>{
   animatePose(position,target,.65,{pose,arc:true,sectionFrom:fromSection,sectionTo:0});syncUI();
   $("status").textContent="观察无附着核糖体的光面内质网管网；与粗面域共用连续腔。";
 });
-$("enter-button").addEventListener("click", () => setLevel(state.level === "inside" ? "section" : "inside"));
+
 $("back-button").addEventListener("click", returnWhole);
 $("micro-button").addEventListener("click", toggleMicro);
 $("surface-patch-button").addEventListener("click",()=>viewModel(CELL_SURFACE_PATCH_ID));
 explorationControls=createExplorationControls({THREE,state,whole,network:cytoskeletonNetwork,camera,controls,visibility,isNavigating:()=>Boolean(navigation),animatePose,requestRender,syncUI,switchScenario,uptakeControls,viral,reactionFocus});
-learningControls=createDetailLearningControls({state,getActive:()=>active,getGuide:()=>STRUCTURE_GUIDE[state.selected],isNavigating:()=>Boolean(navigation),viewModel,requestRender,syncUI,onPlaybackEdit:()=>inspectionPlayChanged=true,fusionIds:FUSION_IDS,focusAnchor(entry){
+learningControls=createDetailLearningControls({state,getActive:()=>active,getGuide:()=>STRUCTURE_GUIDE[state.selected],isNavigating:()=>Boolean(navigation),viewModel,requestRender,syncUI,onPlaybackEdit:()=>inspectionPlayChanged=true,fusionIds:FUSION_IDS,onMembraneView(mode){
+  if(navigation||state.view!=='detail'||state.selected!=='membrane')return;
+  if(mode==='bilayer'){state.level='inside';state.micro=false;toggleMicro();}
+  else setLevel(mode);
+},focusAnchor(entry){
   if(!active||navigation)return;
   if(entry.id==="smooth-er"){$("smooth-er-button").click();return;}
   if(!active.anchors[entry.camera]||!active.anchors[entry.target])return;
-  active.setObservationMode?.(false);const fromSection=active.group.userData.section??state.section;
-  state.level=entry.inside?"inside":"surface";state.micro=Boolean(entry.inside);state.patchSurface=false;state.section=entry.inside?0:(entry.section??0);microTextureScale(entry.inside?true:false);
+  active.setObservationMode?.(false);active.setObservationFocus?.(entry.id);state.erConnectionFocus=false;const fromSection=active.group.userData.section??state.section;
+  state.level=entry.inside?"inside":"surface";state.micro=entry.micro??Boolean(entry.inside);state.patchSurface=false;state.section=entry.section??0;microTextureScale(state.micro);
   const position=worldAnchor(entry.camera),target=worldAnchor(entry.target),scale=activeScale(),distance=position.distanceTo(target);
   const pose={position,target,near:Math.max(1e-6,Math.min(.002*scale,distance*.015)),far:110,minDistance:Math.max(1e-6,distance*.06),maxDistance:active.radius*scale*5};
   animatePose(position,target,.75,{pose,arc:!entry.inside,sectionFrom:fromSection,sectionTo:state.section,closeLate:Boolean(entry.inside)});syncUI();$("subtitle").textContent=catalog[state.selected].name+" · "+entry.title;
 }});
 surfaceActivity=createSurfaceActivityControls({THREE,state,getActive:()=>active,isNavigating:()=>Boolean(navigation),visibility,setDetailTime:v=>detailTime=v,markPlaybackEdit:()=>inspectionPlayChanged=true,animatePose,requestRender,syncUI});
+steadyControls=createSteadyLessonControls({THREE,container:document.querySelector('.atlas'),camera,measure,model:steady,onSeekStage:seekSteadyStep});
+exhibitionLayout=createExhibitionLayout({state,onContextChange:syncSteadyContext});
 $("surface-motion-button").addEventListener("click",()=>{
  if (navigation || !surfaceTargetVisible()) return;
  const isSurface=state.selected===CELL_SURFACE_PATCH_ID;
@@ -1311,7 +1525,7 @@ $("surface-motion-button").addEventListener("click",()=>{
  const pose={position,target,near:Math.max(1e-6,.001*scale),far:110,minDistance:.03*scale,maxDistance:active.radius*scale*4};
  animatePose(position,target,.65,{pose});syncUI();
 });
-document.querySelectorAll("[data-level]").forEach((el) => el.addEventListener("click", () => setLevel(el.dataset.level)));
+
 $("play-button").addEventListener("click", () => {
   if (navigation) return;
   if (state.view === "detail") {
@@ -1322,7 +1536,7 @@ $("play-button").addEventListener("click", () => {
   }
   if (state.progress >= 1) {
     state.progress = 0;
-    if (state.scenario === "virus"){viral.seek?.(0);reactionFocus?.timelineChanged("replay");}
+    if (state.scenario === "virus"){if(isEntryLesson())viralEntry.seek(0);else {viral.seek?.(0);reactionFocus?.timelineChanged("replay");reactionFocus?.focus();}}
   }
   state.playing = !state.playing;
   syncUI();
@@ -1336,7 +1550,8 @@ $("section-range").addEventListener("input", (e) => {
   }
   requestRender();
   state.section = Number(e.target.value) / 100;
-  if (active) active.setSection(state.section);
+  if (isEntryLesson())viralEntry.setSection(state.section);
+  else if (active) active.setSection(state.section);
   else if(!uptakeControls?.section(state.section))whole.setSection(state.section);
   $("section-range").style.setProperty("--value", `${state.section * 100}%`);
   if (state.level === "surface" && state.section > 0) {
@@ -1346,22 +1561,17 @@ $("section-range").addEventListener("input", (e) => {
 });
 $("time-range").addEventListener("input", (e) => {
   if (navigation || state.view === "detail") return;
-  state.progress = Number(e.target.value) / 1e3;
-  state.playing = false;
-  if (state.scenario === "virus"){viral.seek?.(state.progress);reactionFocus?.timelineChanged("seek");}
-  syncUI();
+  seekTeachingProgress(Number(e.target.value)/1e3);
 });
 $("reset-button").addEventListener("click", reset);
 $("follow-button").addEventListener("click", () => {
   if (navigation || state.view !== "whole") return;
   if(state.scenario === "clearance"){uptakeControls.setLocal(!state.uptakeLocal);return;}
   if(state.scenario === "structure"){
-    const target=steady.activityFocus(state.ambientTime);if(!target)return;
-    const distance=5.5;const position=target.clone().add(new THREE.Vector3(.4,.7,distance));
-    const pose={position,target,near:.01,far:110,minDistance:.35,maxDistance:65};
-    animatePose(position,target,.75,{pose});
-    $("status").textContent="已靠近日常运输示意；播放观察，重置返回整胞。";
+    state.steadyOverview=!state.steadyOverview;state.playing=false;syncUI();
+    $("status").textContent=state.steadyOverview?'整胞位置参考；局部教学场景已隐藏。':'局部协作演示；按步骤观察实际货物和交接。';
   } else if (state.scenario === "virus") {
+    if(isEntryLesson()){reset();return;}
     state.cameraHome = false;
     const focused=reactionFocus?.isReceptor()?reactionFocus.toggleSide():reactionFocus?.focus();if(!focused)return;
     $("status").textContent = "镜头跟随实际反应对象；拖动或滚轮可随时接管视角";
@@ -1406,7 +1616,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("keydown", (e) => {
   const focused = document.activeElement;
   if (focused?.tagName === "SELECT" || focused?.tagName === "TEXTAREA" || focused?.tagName === "INPUT" && focused.type !== "range") return;
-  if (e.key === "Escape" && !$("help-dialog").open) {if(state.uptakeLocal)uptakeControls.setLocal(false);else returnWhole();}
+  if (e.key === "Escape" && !$("help-dialog").open) {if(isEntryLesson())reset();else if(state.uptakeLocal)uptakeControls.setLocal(false);else returnWhole();}
   if (e.key.toLowerCase() === "r") reset();
   if (e.code === "Space") {
     e.preventDefault();
@@ -1446,6 +1656,7 @@ renderer.domElement.addEventListener("pointerup", (e) => {
     state.cameraHome = false;
     return;
   }
+  if(isEntryLesson())return;
   if(state.view==="detail"&&active?.metadata?.secretoryDetails&&!navigation){
     const rect=renderer.domElement.getBoundingClientRect();mouse.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(mouse,camera);
     for(const hit of raycaster.intersectObject(active.group,true)){
@@ -1477,6 +1688,10 @@ renderer.domElement.addEventListener("pointerup", (e) => {
       id = item.userData.organelleId;
       item = item.parent;
     }
+    const compartment = whole.components.phagosome;
+    if (id === 'lysosome' && compartment.fusionWall.userData.fusion.joined &&
+      (hit.object === compartment.fusionWall || descendant(hit.object, compartment.dockingContents)) &&
+      (!visibility || visibility.canInspect('phagosome'))) id = 'phagosome';
     if (id && catalog[id] && (!visibility||visibility.canInspect(id))) {
       viewModel(id, { hit });
       break;
@@ -1494,7 +1709,7 @@ function animate(now) {
     if (state.view === "whole") {
       state.ambientTime += dt;
       if(state.scenario !== "structure")state.time += dt;
-      if(state.scenario !== "structure") state.progress = Math.min(1, state.progress + dt / (state.scenario === "virus" ? 64 : 48));
+      if(state.scenario !== "structure"||steadyLessonActive) state.progress = Math.min(1, state.progress + dt / (state.scenario === "structure" ? steady.duration : state.scenario === "virus" ? isEntryLesson()?viralEntry.duration:64 : 48));
       if (state.progress >= 1) {
         state.playing = false;
         syncUI();
@@ -1554,7 +1769,6 @@ function animate(now) {
   }
   // New uptake paths are local representative constructions; never drive a large cargo through the intact whole membrane.
   const wp = uptakeControls?.getWholeProgress()??0.38;
-  uptakeControls?.update();
   if (wp !== appliedWholeProgress) {
     whole.setProgress?.(wp);
     appliedWholeProgress = wp;
@@ -1577,15 +1791,20 @@ function animate(now) {
     skippedFrames++;
     return;
   }
-  whole.update(state.ambientTime, state.view === "whole" && !navigation && !state.uptakeLocal ? dt : 0);
-  cytoplasmMotion?.update(state.ambientTime,state.view === "whole" && !navigation && !state.uptakeLocal ? dt : 0);
-  if(cytoskeletonNetwork?.group.visible)cytoskeletonNetwork.update(state.ambientTime,navigation?0:dt);
-  if (state.scenario === "virus") {
-    viral.setProgress(state.progress);
-    viral.update(state.time, state.view === "whole" && !navigation ? dt : 0);
+  // Isolated molecular lessons must not animate the hidden whole-cell atlas.
+  // Absolute host time is retained, so returning to it resumes its own pose.
+  if(whole.group.visible){
+    whole.update(state.ambientTime, state.view === "whole" && !navigation && !state.uptakeLocal ? dt : 0);
+    cytoplasmMotion?.update(state.ambientTime,state.view === "whole" && !navigation && !state.uptakeLocal ? dt : 0);
+    if(cytoskeletonNetwork?.group.visible)cytoskeletonNetwork.update(state.ambientTime,navigation?0:dt);
   }
-  reactionFocus?.update(raw);
-  if (state.scenario === "structure") steady.update(state.ambientTime);
+  if (state.scenario === "virus") {
+    if(isEntryLesson())viralEntry.seek(state.progress);
+    else {viral.setProgress(state.progress);viral.update(state.time, state.view === "whole" && !navigation ? dt : 0);}
+  }
+  if(!isEntryLesson())reactionFocus?.update(raw);
+  updateClassroomISGWindow();
+  if (state.scenario === "structure") {steady.seek(state.progress);steady.update();steadyControls?.update();}
   if (active && state.view === "detail") active.update(detailTime, navigation ? 0 : dt);
   learningControls?.update();
   updateMembraneActivityStatus();
@@ -1595,13 +1814,15 @@ function animate(now) {
   ao.minDistance = 15e-4 * detailScale;
   ao.maxDistance = 0.25 * detailScale;
   ao.enabled = state.quality !== "low" && !state.micro;
-  const focusEnabled=Boolean(state.userClearView)&&isReceptorFocus()&&!navigation&&!transition&&ao.enabled;
+  const focusEnabled=Boolean(state.userClearView)&&state.scenario!=="virus"&&isReceptorFocus()&&!navigation&&!transition&&ao.enabled;
   if(focusEnabled){camera.updateMatrixWorld();const receptor=viral.group.getObjectByName("SurfaceIFNAR1IFNAR2SchematicReceptor");const depth=-(reactionFocus?.focusPoint()??receptor.getWorldPosition(new THREE.Vector3())).applyMatrix4(camera.matrixWorldInverse).z;focusDOF.setFocus({enabled:true,cameraNear:camera.near,cameraFar:camera.far,focusDistance:Math.max(camera.near,depth),focusRange:.32,focusFalloff:.85,maxBlurCSS:5});}
   else focusDOF.setFocus({enabled:false});
   visibility?.syncMaterials();
   composer.render();
   uptakeControls?.update();
   updateCallouts();
+  classroomOverlay?.update();
+  contentOverlay?.update();
   renderedFrames++;
   lastRenderAt = now;
   needsRender = false;
@@ -1609,9 +1830,68 @@ function animate(now) {
   afterHandoffRender = null;
   if (afterRender) afterRender();
 }
-setupPhases();
+switchScenario("clearance");
+state.progress=0;
+syncUI();
 setQuality("high");
-Promise.allSettled(textureReadiness.map((item) => item.ready)).then((results) => {
+const fusionWarmup={complete:false,passes:0,milliseconds:0};
+const responseWarmup={complete:false,passes:0,milliseconds:0};
+async function prepareResponseRendering(){
+  // First-use uploads and AO/clipping programs otherwise stall the response
+  // when an actor first appears. Prepare its allocated meshes under the loader.
+  const started=performance.now(),roots=scene.children.map(o=>[o,o.visible]),savedCamera=camera.clone();
+  const savedProgress=viral.getDiagnostics().progress,objects=[],materials=new Map();
+  viral.group.traverse(o=>{objects.push([o,o.visible,o.frustumCulled]);for(const m of Array.isArray(o.material)?o.material:[o.material])if(m&&!materials.has(m))materials.set(m,{visible:m.visible,clippingPlanes:m.clippingPlanes});});
+  const product=isgPresentation.object,productMaterials=Array.isArray(product.material)?product.material:[product.material];
+  const warmPlanes=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].map(axis=>new THREE.Plane(new THREE.Vector3(...axis),100));
+  try{
+    for(const [o]of roots)o.visible=o.isLight===true;
+    camera.position.set(0,0,24);camera.lookAt(0,0,0);camera.near=.005;camera.far=110;camera.updateProjectionMatrix();camera.updateMatrixWorld();
+    for(const [i,p]of [.21,.987].entries()){
+      viral.seek(p);
+      viral.group.traverse(o=>{o.visible=true;o.frustumCulled=false;for(const m of Array.isArray(o.material)?o.material:[o.material])if(m)m.visible=true;});
+      if(i===1)for(const m of productMaterials){m.clippingPlanes=warmPlanes;m.needsUpdate=true;}
+      await renderer.compileAsync(viral.group,camera,scene);composer.render();responseWarmup.passes++;
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+    }
+    responseWarmup.complete=true;
+  }finally{
+    for(const [m,saved]of materials){m.visible=saved.visible;if(m.clippingPlanes!==saved.clippingPlanes){m.clippingPlanes=saved.clippingPlanes;m.needsUpdate=true;}}
+    viral.seek(savedProgress);for(const [o,visible,frustumCulled]of objects){o.visible=visible;o.frustumCulled=frustumCulled;}
+    for(const [o,visible]of roots)o.visible=visible;
+    camera.copy(savedCamera,false);camera.updateMatrixWorld();responseWarmup.milliseconds=performance.now()-started;requestRender();
+  }
+}
+async function prepareFusionRendering(){
+  // Compile and draw both topologies while the initial loading cover is still
+  // present. Shader compilation alone does not upload buffers or initialize
+  // the AO/shadow variants used when the pore first becomes visible.
+  const started=performance.now(),models=[viralEntry,loadDetail("snare-fusion",false)];
+  const roots=scene.children.map(object=>[object,object.visible]),savedCamera=camera.clone();
+  try{
+    for(const model of models){
+      const pose=model.getState(),objects=[],materials=new Map();
+      model.group.traverse(object=>{objects.push([object,object.visible]);object.visible=true;for(const material of Array.isArray(object.material)?object.material:[object.material])if(material&&!materials.has(material)){materials.set(material,material.visible);material.visible=true;}});
+      for(const [object]of roots)object.visible=object.isLight===true;
+      for(let owner=model.group;owner&&owner!==scene;owner=owner.parent)owner.visible=true;
+      camera.position.set(1.85,.82,4.35);camera.lookAt(0,0,0);camera.near=.012;camera.far=110;camera.updateProjectionMatrix();camera.updateMatrixWorld();
+      try{
+        model.seek(.9);await renderer.compileAsync(model.group,camera,scene);
+        composer.render();fusionWarmup.passes++;
+        model.seek(.35);composer.render();fusionWarmup.passes++;
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+      }finally{
+        model.seek(pose.progress);for(const [object,visible]of objects)object.visible=visible;for(const [material,visible]of materials)material.visible=visible;
+      }
+    }
+    fusionWarmup.complete=true;
+  }finally{
+    for(const [object,visible]of roots)object.visible=visible;
+    camera.copy(savedCamera,false);camera.updateMatrixWorld();
+    fusionWarmup.milliseconds=performance.now()-started;requestRender();
+  }
+}
+Promise.allSettled(textureReadiness.map((item) => item.ready)).then(async (results) => {
   const failedSources = /* @__PURE__ */ new Set();
   results.forEach((result, index) => {
     if (result.status === "rejected") {
@@ -1631,6 +1911,8 @@ Promise.allSettled(textureReadiness.map((item) => item.ready)).then((results) =>
       }
     }
   });
+  await prepareFusionRendering();
+  await prepareResponseRendering();
   state.ready = true;
   last = performance.now();
   requestRender();
@@ -1644,13 +1926,18 @@ function navigationDiagnostics() {
   return { active: Boolean(navigation), phase: navigation?.phase ?? (inspection ? "detail-idle" : navigationLast.phase), direction: navigation?.direction ?? null, selected: navigation?.selected ?? activeId, source, matchedDetailMatrix: detailRoot.matrixWorld.toArray(), entryWhole: inspection ? { camera: inspection.entry.position.toArray(), target: inspection.entry.target.toArray(), near: inspection.entry.near, far: inspection.entry.far, minDistance: inspection.entry.minDistance, maxDistance: inspection.entry.maxDistance, section: inspection.section, progress: inspection.progress, playing: inspection.playing, cameraHome: inspection.cameraHome, aspect: inspection.aspect } : null, returnWhole: inspection?.returnWhole ?? navigationLast.returnWhole ?? null, macroProgressFrozen: Boolean(inspection), detailTime, pendingCommand: pendingCommand?.type ?? null, handoffPassesEnabled: Boolean(capturePass?.enabled || blendPass?.enabled), sectionOwnership: "Factory local planes and section bindings; factory alone maps planes by active.group.matrixWorld" };
 }
 window.addEventListener("pagehide", () => {
+  steadyControls?.dispose();steady.dispose();exhibitionLayout?.dispose();
   learningControls?.dispose();
   cytoplasmMotion?.dispose();
   surfaceDetail?.dispose();
+  classroomOverlay?.dispose();viralEntry.dispose();
+  contentOverlay?.dispose();
   explorationControls?.dispose();if(cytoskeletonNetwork){whole.group.remove(cytoskeletonNetwork.group);cytoskeletonNetwork.dispose();}surfaceActivity?.dispose();reactionFocus?.dispose();focusDOF.dispose();
   capturePass?.dispose();
   blendPass?.dispose();
 }, { once: true });
-window.__atlas = { cytoplasmMotion,cytoskeletonNetwork,explorationControls,surfaceActivity,reactionFocus,focusDOF,surfaceDetail,setSurfaceDetailMode:mode=>surfaceDetail.setMode(mode), visibility, steady, annotations, state, scene, camera, renderer, composer, controls, whole, viral, get uptake(){return uptakeControls?.model;},uptakeControls, detailRoot, detailCache, viewModel, setLevel, toggleMicro, returnWhole, reset, setQuality, requestRender, setMaterialPreset, diagnostics() {
+window.__atlas = { viralEntry,classroomOverlay,contentOverlay,steadyControls,cytoplasmMotion,cytoskeletonNetwork,explorationControls,surfaceActivity,reactionFocus,focusDOF,surfaceDetail,setSurfaceDetailMode:mode=>surfaceDetail.setMode(mode), visibility, steady, annotations, state, scene, camera, renderer, composer, controls, whole, viral, get uptake(){return uptakeControls?.model;},uptakeControls, detailRoot, detailCache, viewModel, setLevel, toggleMicro, returnWhole, reset, setQuality, requestRender, setMaterialPreset, diagnostics() {
   return { state: { ...state }, cytoplasmMotion:cytoplasmMotion?.diagnostics(),reactionFocus:reactionFocus?.diagnostics(),exploration:explorationControls?.diagnostics(),surfaceActivity:surfaceActivity?.diagnostics(),cytoskeletonNetwork:cytoskeletonNetwork?.diagnostics(),visibility:visibility?.diagnostics(), annotations: annotations?.diagnostics(), materials: { preset: materialPreset,surfaceDetail:surfaceDetail?.diagnostics(), whole: whole.group.userData.atlasMaterials, active: active?.group.userData.atlasMaterials }, depthFocus:focusDOF.diagnostics(),renderScheduling: { demandDriven: true, pending: needsRender, renderedFrames, skippedFrames, lastRenderAt }, transitioning: Boolean(transition || navigation), navigation: navigationDiagnostics(), errors: [...errors], viral: viral.getDiagnostics(), uptake:uptakeControls?.diagnostics(), render: { ...renderer.info.render }, memory: { ...renderer.info.memory }, camera: camera.position.toArray(), target: controls.target.toArray(), active: active ? { id: activeId, radius: active.radius, worldMatrix: active.group.matrixWorld.toArray(), anchors: Object.fromEntries(Object.entries(active.anchors).map(([k, v]) => [k, v.toArray()])), worldAnchors: Object.fromEntries(Object.entries(active.anchors).map(([k, v]) => [k, k.endsWith("Normal") ? v.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(active.group.matrixWorld)).normalize().toArray() : v.clone().applyMatrix4(active.group.matrixWorld).toArray()])), stats: active.stats } : null, frameMs: fpsWindow.slice(-120) };
 } };
+window.__atlas.fusionWarmup=fusionWarmup;
+window.__atlas.responseWarmup=responseWarmup;

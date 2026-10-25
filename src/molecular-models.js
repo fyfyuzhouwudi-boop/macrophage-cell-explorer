@@ -30,7 +30,7 @@ function colorFor(chain,index) {
   else hex=chain.group==="60S"?"#85a7ba":"#d49a83";
   return new THREE.Color(hex).offsetHSL(((index*7)%11-5)*.006,0,((index*3)%7-3)*.012);
 }
-function traceGeometry(source,points,detail) {
+export function traceGeometry(source,points,detail) {
   const positions=[],normals=[],colors=[],indices=[],sides=detail?6:4,step=detail?source.lod.detailStep:source.lod.overviewStep;
   const center=new THREE.Vector3(),previous=new THREE.Vector3(),next=new THREE.Vector3(),tangent=new THREE.Vector3(),normal=new THREE.Vector3(),binormal=new THREE.Vector3(),radial=new THREE.Vector3(),oldNormal=new THREE.Vector3(),reference=new THREE.Vector3();
   let renderedPoints=0,renderedEdges=0,isolatedPoints=0;

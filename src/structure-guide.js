@@ -1,4 +1,4 @@
-const STRUCTURE_GUIDE ={
+const STRUCTURE_GUIDE = {
   "nucleus": {
     "title": "细胞核",
     "function": "保存核基因组，并进行 DNA 复制、RNA 转录与加工；核仁参与核糖体亚基形成。",
@@ -191,7 +191,7 @@ const STRUCTURE_GUIDE ={
         "parts": [
           "er"
         ],
-        "note": "形体不指认特定蛋白的原子结构。进入视图的相机位于 ER 腔，不在脂质双层的疏水核心中。",
+        "note": "形体不指认特定蛋白的原子结构。当前内部入口采用真实连接颈的斜切面，观察核周隙与 ER 水性腔；镜头不进入脂质双层的疏水区。",
         "focus": "er-lumen",
         "sources": [
           {
@@ -719,10 +719,10 @@ const STRUCTURE_GUIDE ={
         ]
       },
       {
-        "name": "分叶状水解酶形体",
-        "function": "示意参与分解的腔内水解酶。",
+        "name": "异质降解残余域",
+        "function": "显示所选降解型区室内不规则的残余材料。",
         "visible": true,
-        "note": "教学形体，不对应某个已解析的酶原子结构。",
+        "note": "这些形体不是水解酶结构；致密外观不能用于判断酶活性或酸度。",
         "views": [
           "ordinary"
         ],
@@ -736,8 +736,8 @@ const STRUCTURE_GUIDE ={
         ]
       },
       {
-        "name": "腔内颗粒与分解片屑",
-        "function": "示意可溶性内容物及处理中货物。",
+        "name": "少量弯曲膜性残片",
+        "function": "所选内体溶酶体中的偏心膜残余，不代表所有溶酶体必有的构造。",
         "visible": true,
         "views": [
           "ordinary"
@@ -783,9 +783,9 @@ const STRUCTURE_GUIDE ={
     "note": "颜色不表示实测 pH。降解并不保证清除所有微生物；某些病原体能干扰成熟或在细胞内存活。"
   },
   "endosome": {
-    "title": "内体",
+    "title": "内体 · 早期分选示例",
     "function": "分选内吞货物；一部分回收至细胞表面，另一部分进入降解途径。",
-    "location": "胞质中的单膜内吞区室；本入口展示带腔内小泡的多泡内体示例。",
+    "location": "胞质中的单膜内吞区室；本入口选择具有连续分选小管的早期内体。",
     "partners": [
       "细胞膜：提供内吞货物并接收回收货物",
       "溶酶体：接续降解途径",
@@ -794,7 +794,7 @@ const STRUCTURE_GUIDE ={
     "features": [
       {
         "name": "内体限制膜与主腔",
-        "function": "界定内吞区室，把主腔与胞质分隔。",
+        "function": "同一层膜围出囊状主腔和相连的细长小管，将内吞内容物与胞质分隔。",
         "visible": true,
         "views": [
           "ordinary"
@@ -842,21 +842,30 @@ const STRUCTURE_GUIDE ={
         ]
       },
       {
-        "name": "回收小管与 ESCRT 机器",
-        "function": "分别参与回收分选和部分 ILV 的形成。",
-        "visible": false,
-        "note": "功能背景；当前没有完整回收小管或 ESCRT 分子装置。",
+        "id": "recycling-tubule",
+        "name": "连续分选小管",
+        "function": "细长小管与囊域保持膜及腔的连续，可参与膜成分和受体分选回收。",
+        "visible": true,
         "views": [
           "ordinary"
         ],
-        "location": "回收小管从内体延伸；ESCRT 在相应膜的胞质侧工作；当前均未建出。",
+        "location": "从囊状主腔延伸的管状域。",
+        "parts": [
+          "endosome"
+        ],
         "partners": [
-          "回收货物",
-          "ILV 形成途径"
-        ]
+          "分选货物",
+          "回收途径"
+        ],
+        "note": "本例两条小管是教学形态选择，不是所有内体的固定数量；未模拟完整回收载体裂分及 ESCRT 分子装置。",
+        "focus": "recycling-tubule"
       }
     ],
     "sources": [
+      {
+        "title": "Franke 等（2019）｜内体分选域的相关显微镜与电子断层",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6771687/"
+      },
       {
         "title": "Alberts 等｜Transport into the Cell from the Plasma Membrane: Endocytosis",
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK26870/"
@@ -866,7 +875,7 @@ const STRUCTURE_GUIDE ={
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK7286/"
       }
     ],
-    "note": "多泡形态只是内体系统的一种状态。内体、溶酶体和吞噬体有不同来源与功能；有颗粒进入内体不意味着其内容物已进入胞质。"
+    "note": "这里显示早期分选内体，腔内只有少量小囊泡；晚期、回收内体具有不同形态。文献提供结构关系，模型没有移用 HeLa 细胞的坐标作为巨噬细胞实测值。进入内体不等于内容物进入胞质。"
   },
   "membrane": {
     "title": "细胞膜",
@@ -1005,10 +1014,10 @@ const STRUCTURE_GUIDE ={
     ],
     "features": [
       {
-        "name": "13 原纤维中空微管",
+        "name": "空心微管与局部组织中心",
         "function": "由微管蛋白聚合形成管壁，作为运输和组织的骨架。",
         "visible": true,
-        "note": "采用常见的 13 原纤维示例；不是所有细胞微管都只可能有 13 条。",
+        "note": "本图显示不等长、温和弯曲的连续空心管；未解析微管蛋白或原纤维排列。",
         "views": [
           "ordinary"
         ],
@@ -1023,8 +1032,8 @@ const STRUCTURE_GUIDE ={
         ]
       },
       {
-        "name": "肌动蛋白螺旋聚合物",
-        "function": "示意可重组的细丝，参与形状、皮层与表面运动。",
+        "name": "膜下分支 F-actin 网络",
+        "function": "不均匀皮质丝和局部母—子分支参与形状与表面运动；只有选定相接分支采用约 70° 示意。",
         "visible": true,
         "views": [
           "ordinary"
@@ -1076,14 +1085,14 @@ const STRUCTURE_GUIDE ={
         ]
       },
       {
-        "name": "中间丝网络",
+        "name": "不等长中间丝支撑网络",
         "function": "为细胞提供另一类力学支撑。",
-        "visible": false,
-        "note": "背景知识；当前骨架详情没有独立建出完整中间丝网络。",
+        "visible": true,
+        "note": "核周部分弧线、局部近似成束及胞质延展；不是经纬笼，也不是巨噬细胞实测路径。",
         "views": [
           "ordinary"
         ],
-        "location": "胞质内的丝状支撑系统；当前没有独立网络模型。",
+        "location": "核周与胞质中的稀疏支撑示意。",
         "partners": [
           "细胞连接与其他骨架系统"
         ]
@@ -1107,7 +1116,7 @@ const STRUCTURE_GUIDE ={
         "url": "https://pubmed.ncbi.nlm.nih.gov/47861/"
       }
     ],
-    "note": "进入微管中央腔是展示管壁排列的观察方式；正常沿微管运输的囊泡在管外，不在微管腔内漂流。"
+    "note": "此入口观察整胞中的同一套实际骨架网络；显示直径与丝数是教学选择。正常沿微管运输的载体在管外，不在中央空腔中漂流。"
   },
   "pore": {
     "title": "核孔复合体",
@@ -1198,7 +1207,7 @@ const STRUCTURE_GUIDE ={
   "phagosome": {
     "title": "吞噬体",
     "function": "包围被吞入的大颗粒，并在成熟、酸化及与内体—溶酶体系统交流后参与降解。",
-    "location": "由细胞表面吞噬过程形成的单膜胞内区室；其腔内货物尚未因此进入胞质。",
+    "location": "吞噬大颗粒后形成的单膜区室；局部模型选用不规则细胞性货物。",
     "partners": [
       "细胞膜与肌动蛋白：形成吞噬杯",
       "微管与马达：参与运输和定位",
@@ -1273,6 +1282,10 @@ const STRUCTURE_GUIDE ={
     ],
     "sources": [
       {
+        "title": "Levin-Konigsberg 等（2019）｜巨噬细胞吞噬货物降解与区室重塑",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8340083/"
+      },
+      {
         "title": "Alberts 等｜Innate Immunity：Phagocytic Cells",
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK26846/"
       },
@@ -1281,7 +1294,7 @@ const STRUCTURE_GUIDE ={
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK9953/"
       }
     ],
-    "note": "吞噬体是有来源和成熟过程的区室，不与内体或溶酶体互换名称。清除剧情压缩了真实时间并省略许多调控步骤。"
+    "note": "吞噬体属于动态膜性细胞器/区室，外形及腔隙受货物与成熟阶段影响。本例是关系示意，未把论文中溶酶体融合后的阶段当作刚闭合的吞噬体。"
   },
   "peroxisome": {
     "title": "过氧化物酶体",
@@ -1310,8 +1323,8 @@ const STRUCTURE_GUIDE ={
         ]
       },
       {
-        "name": "密集酶基质与酶聚团",
-        "function": "示意氧化代谢及过氧化氢处理的酶内容物。",
+        "name": "分布式细颗粒酶基质",
+        "function": "细颗粒分布于膜内基质，用于表示氧化代谢和过氧化氢处理相关酶。",
         "visible": true,
         "note": "通用教学形体，不把每个颗粒指认为过氧化氢酶或某一种已解析的蛋白。",
         "views": [
@@ -1330,7 +1343,7 @@ const STRUCTURE_GUIDE ={
         "name": "特定晶体核心",
         "function": "某些物种、组织的过氧化物酶体可有酶晶体。",
         "visible": false,
-        "note": "背景知识；非通用特征；本模型未把酶聚团称作巨噬细胞必有晶核。",
+        "note": "背景知识；本例没有中央晶核。部分动物肝细胞的尿酸氧化酶晶体不能视为人巨噬细胞的通用结构。",
         "views": [
           "ordinary"
         ],
@@ -1342,6 +1355,14 @@ const STRUCTURE_GUIDE ={
     ],
     "sources": [
       {
+        "title": "Schrader 等（1994）｜人源 HepG2 细胞过氧化物酶体形态异质性",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/7813516/"
+      },
+      {
+        "title": "Usuda 等（1988）｜过氧化物酶体尿酸氧化酶的组织及物种差异",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/3336202/"
+      },
+      {
         "title": "Cooper｜Peroxisomes",
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK9930/"
       },
@@ -1350,7 +1371,7 @@ const STRUCTURE_GUIDE ={
         "url": "https://www.ncbi.nlm.nih.gov/books/NBK26858/"
       }
     ],
-    "note": "过氧化物酶体不等同于装有酸性水解酶的溶酶体，也不因形状相似而具有相同功能。"
+    "note": "椭球是本例的展示选择，不能仅凭形状鉴定过氧化物酶体。这里没有大块摄入货物、线粒体嵴或自身基因组；基质不等同于溶酶体的酸性降解腔。"
   },
   "ribosome": {
     "title": "核糖体",
@@ -1559,7 +1580,4 @@ const SCENARIO_GUIDE = {
     ]
   }
 };
-export {
-  SCENARIO_GUIDE,
-  STRUCTURE_GUIDE
-};
+export { STRUCTURE_GUIDE, SCENARIO_GUIDE };

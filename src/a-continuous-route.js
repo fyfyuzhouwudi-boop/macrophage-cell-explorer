@@ -4,7 +4,9 @@ const cl=x=>THREE.MathUtils.clamp(x,0,1),sm=x=>{x=cl(x);return x*x*(3-2*x);};
 const cubic=(a,b,c,d,t)=>(1-t)**3*a+3*(1-t)**2*t*b+3*(1-t)*t*t*c+t**3*d;
 export const A_ROUTE_EVENT=.62;
 export function createContinuousPhagocyticRoute({detail=true}={}){
-  const radius=1.105,halfThickness=.005,corner=.009,splitShift=.030,cols=detail?36:24;
+  // One lipid bilayer, with two finite material interfaces. Thickness is
+  // deliberately exaggerated at this teaching scale; it is not two membranes.
+  const radius=1.105,halfThickness=.018,corner=.022,splitShift=.052,cols=detail?36:24;
   const nc=detail?24:16,nl=detail?8:6,nt=4,nf=detail?8:6,nb=detail?10:8,ncap=detail?4:3;
   const finalTheta=Math.PI-Math.asin(.12/radius),cutRow=nc+nl+nt/2;
   const state={progress:0,phase:'open_connected',theta:.22,neckRadius:0,neckInnerRadius:0,scission:false,splitShift,particleCenter:V(),transport:V(),cupCenter:V(),cutZ:0,membraneThickness:halfThickness*2};
@@ -20,7 +22,7 @@ export function createContinuousPhagocyticRoute({detail=true}={}){
     for(let i=1;i<=nt;i++)pts.push({r:rn,z:zn+.055*i/nt,part:'neck-throat'});
     const ztop=zn+.055,shoulderZ=ztop+.08;
     for(let i=1;i<=nf;i++){const t=i/nf;pts.push({r:cubic(rn,rn,radius+.20,radius+.42,t),z:cubic(ztop,ztop+.055,shoulderZ,shoulderZ,t),part:'neck-upper'});}
-    for(let i=1;i<=nb;i++){const t=i/nb;pts.push({r:radius+.42+(2.65-radius-.42)*t,z:shoulderZ*(1-(6*t**5-15*t**4+10*t**3)),part:'background'});}
+    for(let i=1;i<=nb;i++){const t=i/nb;pts.push({r:radius+.42+(1.95-radius-.42)*t,z:shoulderZ*(1-(6*t**5-15*t**4+10*t**3))-.06*t*t,part:'background'});}
     state.theta=theta;state.neckRadius=rn;state.neckInnerRadius=rn-halfThickness;state.cupCenter.set(0,0,cz);state.cutZ=zn+.0275;return pts;
   }
   function meridianNormals(points,firstSign=-1,lastSign=null){return points.map((q,i)=>{

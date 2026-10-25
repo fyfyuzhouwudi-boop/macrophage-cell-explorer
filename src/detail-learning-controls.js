@@ -1,6 +1,6 @@
 // Native controls for structure-focused views and independently timed fusion examples.
 // The application owns navigation and playback; this module owns only its controls.
-export function createDetailLearningControls({state,getActive,getGuide,isNavigating,focusAnchor,viewModel,requestRender,syncUI,onPlaybackEdit,fusionIds}) {
+export function createDetailLearningControls({state,getActive,getGuide,isNavigating,focusAnchor,viewModel,requestRender,syncUI,onPlaybackEdit,fusionIds,onMembraneView}) {
   const $=id=>document.getElementById(id);
   const structure=document.createElement('section');
   structure.id='structure-focus-panel';structure.className='structure-focus-panel';structure.hidden=true;
@@ -8,6 +8,13 @@ export function createDetailLearningControls({state,getActive,getGuide,isNavigat
   $('back-button').insertAdjacentElement('beforebegin',structure);
   const legend=document.createElement('div');legend.id='bilayer-legend';legend.className='bilayer-legend';legend.hidden=true;
   legend.innerHTML='<span><i class="leaflet-out"></i>胞外叶 · 亲水头</span><span><i class="leaflet-in"></i>胞质叶 · 亲水头</span><span><i class="leaflet-tail"></i>相向双尾 · 疏水区</span><p>蛋白跨膜段位于双层中；两端结构域伸向水相。颜色区分膜两侧。</p>';
+  const membraneViews=document.createElement('div');membraneViews.className='membrane-view-controls';membraneViews.setAttribute('aria-label','细胞膜观察视图');
+  for(const [key,title]of [['surface','膜表面'],['section','膜壁剖面'],['bilayer','磷脂双层局部']]){
+    const button=document.createElement('button');button.type='button';button.dataset.membraneView=key;button.textContent=title;
+    button.addEventListener('click',()=>{if(!isNavigating())onMembraneView?.(key);});membraneViews.append(button);
+  }
+  legend.append(membraneViews);
+  const glycans=document.createElement('p');glycans.textContent='胞外的短分枝为少量糖链示例，锚定于外层脂质；不代表完整糖萼的密度。';legend.append(glycans);
   structure.insertAdjacentElement('beforebegin',legend);
   const panel=document.createElement('section');panel.id='fusion-controls';panel.className='fusion-controls';panel.hidden=true;
   panel.innerHTML='<div class="eyebrow">微观过程 · 可逐步观察</div><div class="fusion-stages"></div><p class="fusion-stage-description" aria-live="polite"></p><label for="fusion-progress">反应进度 <output id="fusion-progress-value">0%</output></label><input id="fusion-progress" type="range" min="0" max="1000" value="0" aria-label="膜融合反应进度"><button id="fusion-replay" class="micro-button" type="button">从头播放融合过程</button><p class="fusion-topology-note"></p>';
@@ -30,18 +37,33 @@ export function createDetailLearningControls({state,getActive,getGuide,isNavigat
     links.hidden=detail||state.scenario==='structure';
     links.querySelectorAll('button').forEach(b=>b.disabled=isNavigating());
     legend.hidden=!detail||state.selected!=='membrane';
+    for(const b of membraneViews.children){b.disabled=isNavigating();b.setAttribute('aria-pressed',String(b.dataset.membraneView===(state.micro?'bilayer':state.level==='surface'?'surface':'section')));}
     const entries=model?.metadata?.secretoryDetails??[];
     structure.hidden=!detail||!entries.length;
     const nextKey=detail?state.selected+':'+state.connectedER:'';
     if(key!==nextKey){key=nextKey;selectedFocus=null;structure.querySelector('.structure-focus-buttons').replaceChildren();structure.querySelector('.structure-focus-description').textContent='选择一处，靠近查看它的形态、朝向和功能。';
       for(const entry of entries){const b=document.createElement('button');b.type='button';b.dataset.focusKey=entry.key??entry.id;b.textContent=entry.label??entry.title;b.setAttribute('aria-pressed','false');b.addEventListener('click',()=>focus(entry));structure.querySelector('.structure-focus-buttons').append(b);}}
     structure.querySelectorAll('button').forEach(b=>b.disabled=isNavigating());
+    if (detail && state.selected === 'er' && state.connectedER) {
+      const lumen = entries.find(entry => entry.id === 'er-lumen');
+      if (state.level === 'inside' && !state.micro && lumen) {
+        selectedFocus = 'er-lumen';
+        structure.querySelector('.structure-focus-description').textContent = lumen.description;
+      } else if (selectedFocus === 'er-lumen') {
+        selectedFocus = null;
+        structure.querySelector('.structure-focus-description').textContent = '选择一处，靠近查看它的形态、朝向和功能。';
+      }
+      for (const button of structure.querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.focusKey === selectedFocus));
+    }
     panel.hidden=!isFusion;
     compartment.hidden=!isFusion;
     if(isFusion){const current=modelState(),stages=model.stages??model.metadata?.stages??current.stages??[];
       const ha=state.selected==='ha-fusion';compartment.innerHTML=ha?'<strong>流感 HA · 内体中的局部</strong><span>上方：病毒内部</span><span>膜间：内体腔 · HA 伸展与折返</span><span>下方：细胞质</span><small>孔开放后：病毒内部 ↔ 细胞质</small>':'<strong>SNARE · 两个胞内膜室</strong><span>上、下：各自的水性腔</span><span>膜间：胞质 · 四螺旋装配</span><small>STX7 / VTI1B / STX8 + VAMP7</small><small>孔开放后：两侧腔室相通</small>';
       if(stageKey!==state.selected){stageKey=state.selected;lastStage=-1;panel.querySelector('.fusion-stages').replaceChildren();
-        for(const [i,stage]of stages.entries()){const b=document.createElement('button');b.type='button';b.dataset.stage=String(i);b.textContent=`${i+1} ${stage.title??stage.name}`;b.addEventListener('click',()=>seek(stage.at));panel.querySelector('.fusion-stages').append(b);}}
+        for(const [i,stage]of stages.entries()){const b=document.createElement('button');b.type='button';b.dataset.stage=String(i);b.textContent=`${i+1} ${stage.title??stage.name}`;
+          // A stage button selects a readable pose within that stage. The
+          // slider still exposes the exact onset, including its tiny new pore.
+          b.addEventListener('click',()=>seek(i===0?stage.at:stage.at+((stages[i+1]?.at??1)-stage.at)*.45));panel.querySelector('.fusion-stages').append(b);}}
       panel.querySelectorAll('button,input').forEach(b=>b.disabled=isNavigating());
       panel.querySelector('.fusion-topology-note').textContent=model.metadata?.timelineNote??'论文约束的教学关键构象；进度与速度用于说明动作顺序。';
       update();

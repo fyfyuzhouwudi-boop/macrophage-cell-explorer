@@ -1,5 +1,6 @@
 Third-party software notices for macrophage-atlas-v6.
-Node.js is an external optional runtime, not redistributed.
+Node.js is required for source development, not redistributed.
+The portable HTML does not require Node.js or Python; neither is redistributed.
 No OpenOrganelle data or pathtracer code is bundled in the HTML.
 
 ----------------------------------------
@@ -78,8 +79,18 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-RCSB coordinate datasets: 1JFF and 4UG0 are supplied under CC0.
+wwPDB coordinate data used for source-derived traces: 1JFF, 4UG0, 1DGF, 7Q86.
+The coordinate data are available under CC0; article figures and web page
+images are not covered by that coordinate-data dedication.
 Data policy: https://www.rcsb.org/pages/policies
-Coordinate provenance: SOURCES.md and src/molecular-structure-data.js.
-Raw PDB/CIF files are not required by the supplied runtime or ordinary build.
+wwPDB usage policy: https://www.wwpdb.org/about/usage-policies
+Source-repository identities and notes: SOURCES.md; assets/molecular-sources/;
+src/peroxisomal-enzyme-data.js; qa/source-cache/.
+In the portable package, see the accompanying source-reference document
+(资料来源.md); source-repository folders need not be included in that package.
+1DGF: Putnam et al., J Mol Biol 2000, DOI 10.1006/jmbi.1999.3458.
+7Q86: Sonani et al., Int J Biol Macromol 2022,
+DOI 10.1016/j.ijbiomac.2022.02.008.
+CAT and ACOX1 are independently enlarged C-alpha biological-assembly traces,
+not in-situ macrophage identifications, atomic surfaces or complete active sites.
 No Cell Image Library image or article figure is included in the runtime.

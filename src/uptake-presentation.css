@@ -1,0 +1,32 @@
+.uptake-presentation{position:absolute;left:0;top:0;z-index:3;pointer-events:none;overflow:hidden}
+.uptake-presentation[hidden]{display:none}
+.uptake-presentation .uptake-label{transform:none;box-sizing:border-box;min-height:56px;padding:8px 23px 8px 10px;border:1px solid #dce5e8;border-left:3px solid var(--uptake-label-color);border-radius:7px;max-width:none;text-align:left;color:#345565;background:#fffffff2;box-shadow:0 3px 12px #314e5d08}
+.uptake-label strong{display:block;font-size:11px;line-height:1.7;font-weight:650}
+.uptake-label-description{display:block;margin-top:2px;font-size:10px;line-height:1.75;color:#748b97;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uptake-label[aria-expanded=true] .uptake-label-description{white-space:normal;overflow:visible;color:#486977}
+.uptake-label[aria-expanded=true]{border-color:var(--uptake-label-color);background:#fff}
+.uptake-label-plus{position:absolute;right:8px;top:9px;color:#91a4ad;font-size:10px}
+.uptake-presentation .uptake-leaders path{stroke-width:1;opacity:.72;stroke-linecap:round;stroke-linejoin:round}
+.uptake-presentation .uptake-leaders circle{stroke-width:1}
+.uptake-causal-strip{position:absolute;left:28px;right:28px;display:grid;grid-template-columns:1fr 1.6fr 1fr;padding:11px 0;border:1px solid #e0e8eb;border-radius:11px;background:#fffffff5;box-shadow:0 4px 15px #304b5f06}
+.uptake-causal-cell{min-width:0;padding:0 14px}.uptake-causal-cell+.uptake-causal-cell{border-left:1px solid #e4ebed}
+.uptake-causal-caption{display:block;font-size:9px;line-height:1.65;color:#8a9fa9;letter-spacing:.5px}
+.uptake-causal-cell p{margin:4px 0 0;font-size:11px;line-height:1.75;color:#607e8c;overflow-wrap:anywhere}
+.uptake-motion-title{display:block;margin-top:3px;color:#315b6c;font-size:11px;line-height:1.7}
+.uptake-chapter{position:absolute;left:28px;right:28px;display:flex;align-items:center;justify-content:center;gap:28px;color:#9baab1;font-size:10px;line-height:1.8;letter-spacing:1px}
+.uptake-chapter span{padding-bottom:3px;border-bottom:2px solid transparent}.uptake-chapter .is-current{color:#97713d;border-color:#d3b17b}
+.uptake-presentation.is-compact .uptake-causal-strip{left:18px;right:18px}.uptake-presentation.is-compact .uptake-causal-cell{padding:0 10px}.uptake-presentation.is-compact .uptake-causal-cell p{font-size:10px}
+body.uptake-lesson-active .view-hint{visibility:hidden}
+body.uptake-lesson-active #journey-panel .phase-list{display:grid;gap:3px;margin:12px 0 16px}
+body.uptake-lesson-active #journey-panel .phase-list::before,body.uptake-lesson-active .phase-node{display:none}
+body.uptake-lesson-active #journey-panel .phase-button{min-height:37px;padding:7px 10px;border:1px solid transparent;border-radius:7px;background:transparent;font-size:12px;line-height:1.7;gap:10px}
+body.uptake-lesson-active #journey-panel .phase-button::before{content:attr(data-step-number);font-size:10px;color:#92a7af;font-variant-numeric:tabular-nums}
+body.uptake-lesson-active #journey-panel .phase-button.active{color:#325d6c;background:#eff5f5;border-color:#dce8e9}
+body.uptake-lesson-active #journey-panel #phase-description{font-size:11px;line-height:1.9;color:#6b8592;margin:10px 0 16px;min-height:0}
+body.uptake-lesson-active #follow-button{min-height:41px;margin-top:10px;font-size:12px}
+body.uptake-lesson-active .control-bar>.control-divider,body.uptake-lesson-active .control-bar>.section-control{display:none}
+body.uptake-lesson-active .control-bar>.section-label,body.uptake-lesson-active #section-range{display:none}
+body.uptake-lesson-active .control-bar{width:auto;min-width:330px}
+body.uptake-lesson-active .uptake-controls .micro-button{font-size:10px;min-height:30px;margin:5px 0}
+body.uptake-lesson-active .uptake-omission{font-size:9px;line-height:1.75;padding:7px 9px;margin:7px 0}
+@media(max-height:780px){.uptake-causal-cell p{font-size:10px}.uptake-causal-strip{padding:8px 0}.uptake-presentation .uptake-label{padding-top:6px;padding-bottom:6px;min-height:49px}.uptake-chapter{font-size:9px}}

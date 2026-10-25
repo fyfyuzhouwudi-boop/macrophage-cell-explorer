@@ -86,8 +86,22 @@ function poreProfile(s, height) {
   return { y: height * s / denominator, dy: height * shape / denominator ** 3 };
 }
 
+// One common meridian for the pinching diaphragm and the subsequent pore.
+// Reusing it on either side of the topology event avoids a whole-patch jump.
+function porePoint(s,aperture,height,side,derivatives=false){
+  const throat=aperture+HALF_BILAYER,a=PATCH_RADIUS-throat,profile=poreProfile(s,height);
+  const dr=2*a*s,dy=profile.dy,length=Math.hypot(dr,dy),nr=dy/length,ny=-dr/length;
+  const p={r:throat+a*s*s+side*HALF_BILAYER*nr,y:profile.y+side*HALF_BILAYER*ny,nr:side*nr,ny:side*ny};
+  if(derivatives){
+    const ddy=-3*height*.1*.9*s/(.1+.9*s*s)**2.5,ddr=2*a,dl=(dr*ddr+dy*ddy)/length;
+    p.dr=dr+side*HALF_BILAYER*(ddy*length-dy*dl)/(length*length);
+    p.dy=dy+side*HALF_BILAYER*(-ddr*length+dr*dl)/(length*length);
+  }
+  return p;
+}
+
 function material(color, extra = {}) {
-  return new THREE.MeshPhysicalMaterial({ color, roughness: .42, metalness: 0, clearcoat: .22, clearcoatRoughness: .38, side: THREE.DoubleSide, ...extra });
+  return new THREE.MeshPhysicalMaterial({ color, roughness: .51, metalness: 0, clearcoat: .08, clearcoatRoughness: .58, side: THREE.DoubleSide, ...extra });
 }
 
 function indexedGrid(nu, nv) {
@@ -105,11 +119,12 @@ function indexedGrid(nu, nv) {
 // A radial surface has real polar-head positions and paired inward tails.  The
 // section is constructed geometrically, including the boundary strips: it does
 // not depend on transparency, depth tricks, screen masks, or a black hole decal.
-function makeLeaflet(parent, name, color, detail, geometries, materials) {
-  const nu = detail ? 28 : 18, nv = detail ? 64 : 40;
+function makeLeaflet(parent, name, color, detail, geometries, materials, joined=false) {
+  const nu = (detail ? 28 : 18)*(joined?2:1), nv = detail ? 64 : 40;
   const geometry = indexedGrid(nu, nv), faceMaterial = material(color, { roughness: .55 });
   const face = new THREE.Mesh(geometry, faceMaterial); face.name = name + 'ContinuousSurface';
   face.frustumCulled = false; parent.add(face); geometries.add(geometry); materials.add(faceMaterial);
+  face.userData.gridNu=nu;face.userData.gridNv=nv;
   const rows = detail ? 13 : 9, sites = [];
   for (let row = 0; row < rows; row++) {
     const u = (row + .55) / rows, n = Math.round(11 + u * (detail ? 42 : 28));
@@ -118,23 +133,57 @@ function makeLeaflet(parent, name, color, detail, geometries, materials) {
     // against the hydrophobic cross-section; these are not additional leaflets.
     sites.push({ u, a: 0, edge: -1, seed: row * 71 + 67 }, { u, a: 1, edge: 1, seed: row * 71 + 68 });
   }
+  if(joined){const half=sites.splice(0);for(const sign of [1,-1])for(const site of half)sites.push({...site,u:(1+sign*site.u)/2});}
   const headGeometry = new THREE.SphereGeometry(.027, 12, 8), tailGeometry = new THREE.CylinderGeometry(.0075, .006, 1, 5, 1);
   const headMaterial = material(color), tailMaterial = material(color, { color: new THREE.Color(color).multiplyScalar(.60), roughness: .68 });
   const heads = new THREE.InstancedMesh(headGeometry, headMaterial, sites.length);
   const tails = new THREE.InstancedMesh(tailGeometry, tailMaterial, sites.length * 2);
   heads.name = name + 'PolarHeads'; tails.name = name + 'PairedAcylTails';
   for (const m of [heads, tails]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; parent.add(m); }
+  if(joined){
+    const upper=new THREE.Color(joined[0]),lower=new THREE.Color(joined[1]);
+    const colors=new Float32Array((nu+1)*(nv+1)*3),tint=new THREE.Color();
+    for(let u=0;u<=nu;u++){tint.copy(lower).lerp(upper,smooth((u/nu-.47)/.06));for(let v=0;v<=nv;v++)tint.toArray(colors,(u*(nv+1)+v)*3);}
+    geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));faceMaterial.color.set('#ffffff');faceMaterial.vertexColors=true;
+    headMaterial.color.set('#ffffff');tailMaterial.color.setRGB(.6,.6,.6);
+    sites.forEach((site,i)=>{tint.copy(site.u>.5?upper:lower);heads.setColorAt(i,tint);tails.setColorAt(i*2,tint);tails.setColorAt(i*2+1,tint);});
+  }
   geometries.add(headGeometry); geometries.add(tailGeometry); materials.add(headMaterial); materials.add(tailMaterial);
-  const object = new THREE.Object3D(), axis = V(0, 1, 0), position = V(), normal = V(), tangent = V(), end = V(), delta = V();
+  const position = V(), normal = V(), tangent = V(), end = V(), delta = V(), xAxis = V(), zAxis = V();
+  const cosines=new Float64Array(nv+1),sines=new Float64Array(nv+1);
+  let previousSection=NaN,oriented=false;
+  // Compose directly into the GPU instance buffer. No per-lipid Object3D,
+  // quaternion allocation or duplicate setMatrixAt copy is needed.
+  function instance(array,index,p,y,x,sx,sy,sz){
+    zAxis.crossVectors(x,y);const k=index*16;
+    array[k]=x.x*sx;array[k+1]=x.y*sx;array[k+2]=x.z*sx;array[k+3]=0;
+    array[k+4]=y.x*sy;array[k+5]=y.y*sy;array[k+6]=y.z*sy;array[k+7]=0;
+    array[k+8]=zAxis.x*sz;array[k+9]=zAxis.y*sz;array[k+10]=zAxis.z*sz;array[k+11]=0;
+    array[k+12]=p.x;array[k+13]=p.y;array[k+14]=p.z;array[k+15]=1;
+  }
   function update(evaluate, section, time, tailLength = HALF_BILAYER * .87) {
     const cut = section * Math.PI * .86, start = Math.PI / 2 + cut / 2, sweep = TAU - cut;
+    if(section!==previousSection){for(let v=0;v<=nv;v++){const theta=start+sweep*v/nv;cosines[v]=Math.cos(theta);sines[v]=Math.sin(theta);}previousSection=section;}
     const pa = geometry.attributes.position, na = geometry.attributes.normal;
     for (let u = 0; u <= nu; u++) {
       const point = evaluate(u / nu);
       for (let v = 0; v <= nv; v++) {
-        const theta = start + sweep * v / nv, c = Math.cos(theta), s = Math.sin(theta), i = u * (nv + 1) + v;
+        const c = cosines[v], s = sines[v], i = u * (nv + 1) + v;
         pa.setXYZ(i, point.r * c, point.y, point.r * s);
         na.setXYZ(i, point.nr * c, point.ny, point.nr * s);
+      }
+    }
+    if(!oriented){
+      // Parameter order differs for the four leaflet sides. Three flips the
+      // shader normal on a back face, so index winding must agree with the
+      // analytic outward normal rather than relying on DoubleSide to hide it.
+      const indices=geometry.index.array,a=V(),b=V(),c=V(),cross=V(),expected=V();
+      for(let k=0;k<indices.length;k+=3){
+        a.fromBufferAttribute(pa,indices[k]);b.fromBufferAttribute(pa,indices[k+1]);c.fromBufferAttribute(pa,indices[k+2]);
+        cross.crossVectors(b.sub(a),c.sub(a));if(cross.lengthSq()<1e-16)continue;
+        expected.fromBufferAttribute(na,indices[k+1]);
+        if(cross.dot(expected)<0){for(let j=0;j<indices.length;j+=3)[indices[j+1],indices[j+2]]=[indices[j+2],indices[j+1]];geometry.index.needsUpdate=true;}
+        oriented=true;break;
       }
     }
     pa.needsUpdate = true; na.needsUpdate = true;
@@ -143,14 +192,16 @@ function makeLeaflet(parent, name, color, detail, geometries, materials) {
       const theta = start + sweep * site.a + (site.edge ? edgeOffset : .004 * Math.sin(time * .7 + site.seed)), c = Math.cos(theta), s = Math.sin(theta);
       normal.set(p.nr * c, p.ny, p.nr * s).normalize(); tangent.set(-s, 0, c);
       position.set(p.r * c, p.y, p.r * s).addScaledVector(normal, .009);
-      object.position.copy(position); object.quaternion.setFromUnitVectors(axis, normal); object.scale.set(1, .76, 1); object.updateMatrix(); heads.setMatrixAt(i, object.matrix);
+      instance(heads.instanceMatrix.array,i,position,normal,tangent,1,.76,1);
       for (let tail = 0; tail < 2; tail++) {
         const offset = (tail ? 1 : -1) * .010;
         end.copy(position).addScaledVector(tangent, offset).addScaledVector(normal, -tailLength);
         end.addScaledVector(tangent, (tail ? -.007 : .007) * Math.sin(site.seed * 1.7));
         delta.copy(end).sub(position).addScaledVector(tangent, -offset);
-        object.position.copy(position).addScaledVector(tangent, offset).addScaledVector(delta, .5);
-        object.quaternion.setFromUnitVectors(axis, delta.clone().normalize()); object.scale.set(1, delta.length(), 1); object.updateMatrix(); tails.setMatrixAt(i * 2 + tail, object.matrix);
+        end.copy(position).addScaledVector(tangent,offset).addScaledVector(delta,.5);
+        const length=delta.length();delta.divideScalar(length);
+        xAxis.copy(tangent).addScaledVector(delta,-tangent.dot(delta)).normalize();
+        instance(tails.instanceMatrix.array,i*2+tail,end,delta,xAxis,1,length,1);
       }
     }
     heads.instanceMatrix.needsUpdate = true; tails.instanceMatrix.needsUpdate = true;
@@ -158,14 +209,15 @@ function makeLeaflet(parent, name, color, detail, geometries, materials) {
   return { face, heads, tails, update, sites: sites.length };
 }
 
-function meridian(evalPosition, u, outward = 1) {
-  const p = evalPosition(u), a = evalPosition(Math.max(0, u - .0005)), b = evalPosition(Math.min(1, u + .0005));
-  const dr = b.r - a.r, dy = b.y - a.y, length = Math.hypot(dr, dy) || 1;
-  return { ...p, nr: -dy / length * outward, ny: dr / length * outward };
+function radialNormal(r,y,slope,outward=1){
+  const inverse=outward/Math.hypot(1,slope);
+  return {r,y,nr:-slope*inverse,ny:inverse};
 }
 
 function makeCap(parent, name, color, geometries, materials, segments = 28) {
-  const geometry = indexedGrid(segments, 1), capMaterial = material(color, { roughness: .65 });
+  const gradient=Array.isArray(color),geometry = indexedGrid(segments, 1), capMaterial = material(gradient?'#ffffff':color, { roughness: .65,vertexColors:gradient });
+  const lower=gradient?new THREE.Color(color[0]):null,upper=gradient?new THREE.Color(color[1]):null,tint=new THREE.Color();
+  if(gradient)geometry.setAttribute('color',new THREE.BufferAttribute(new Float32Array((segments+1)*2*3),3).setUsage(THREE.DynamicDrawUsage));
   const mesh = new THREE.Mesh(geometry, capMaterial); mesh.name = name; mesh.frustumCulled = false; parent.add(mesh);
   geometries.add(geometry); materials.add(capMaterial);
   return {
@@ -178,9 +230,11 @@ function makeCap(parent, name, color, geometries, materials, segments = 28) {
         for (let j = 0; j < 2; j++) {
           const v = (j ? b : a)(radial ? 1 : u);
           p.setXYZ(i * 2 + j, v.r * Math.cos(angle), v.y, v.r * Math.sin(angle));
+          if(gradient){tint.copy(lower).lerp(upper,smooth((v.y+.035)/.07));geometry.attributes.color.setXYZ(i*2+j,tint.r,tint.g,tint.b);}
         }
       }
       p.needsUpdate = true; geometry.computeVertexNormals();
+      if(gradient)geometry.attributes.color.needsUpdate=true;
     },
   };
 }
@@ -223,14 +277,14 @@ export function createFusionLab({ caseId = 'snare-fusion', detail = true } = {})
     makeLeaflet(patches, 'LowerDistalLeaflet', '#5f9cb5', detail, geometries, materials),
     makeLeaflet(patches, 'LowerProximalLeaflet', '#8bc1ce', detail, geometries, materials),
   ];
-  const fused = [makeLeaflet(pore, 'FusionPoreLumenFacingLeaflet', '#d9b88a', detail, geometries, materials), makeLeaflet(pore, 'FusionPoreOuterLeaflet', '#8ebbc0', detail, geometries, materials)];
+  const fused = [makeLeaflet(pore, 'FusionPoreLumenFacingLeaflet', '#d9b88a', detail, geometries, materials,['#e3aa6a','#5f9cb5']), makeLeaflet(pore, 'FusionPoreOuterLeaflet', '#8ebbc0', detail, geometries, materials,['#ecc591','#8bc1ce'])];
   const cutCaps = [], outerCaps = [];
   for (let i = 0; i < 2; i++) {
     cutCaps.push([0, 1].map(j => makeCap(patches, `Membrane${i}SectionEdge${j}`, i ? '#698e99' : '#ab8055', geometries, materials)));
     outerCaps.push(makeCap(patches, `Membrane${i}PatchBoundary`, i ? '#698e99' : '#ab8055', geometries, materials, 64));
   }
-  const poreCaps = [0, 1].map(i => makeCap(pore, 'FusedMembraneSectionEdge' + i, '#a49879', geometries, materials, 56));
-  const poreEnds = [0, 1].map(i => makeCap(pore, 'FusedPatchOuterBoundary' + i, i ? '#698e99' : '#ab8055', geometries, materials, 64));
+  const poreCaps = [0, 1].map(i => makeCap(pore, 'FusedMembraneSectionEdge' + i, ['#698e99','#ab8055'], geometries, materials, 56));
+  const poreEnds = [0, 1].map(i => makeCap(pore, 'FusedPatchOuterBoundary' + i, i ? '#ab8055' : '#698e99', geometries, materials, 64));
   const colors = isHA ? ['#ba85c6', '#cf91ad', '#8c9cce'] : ['#a57bc1', '#58a9b2', '#d9966f', '#e4bc5c'];
   const complexes = [];
   const sphereGeometry = new THREE.SphereGeometry(1, 14, 10), anchorGeometry = new THREE.CylinderGeometry(.026, .026, .19, 9);
@@ -254,30 +308,42 @@ export function createFusionLab({ caseId = 'snare-fusion', detail = true } = {})
   const tracers = new THREE.InstancedMesh(sphereGeometry, tracerMaterial, 12); tracers.name = 'AqueousConnectivityTracers_NotVirionGenome'; tracers.frustumCulled = false; group.add(tracers);
   const traceObject = new THREE.Object3D();
   let progress = 0, localTime = 0, section = .78, disposed = false, topology = 'separate', poreRadius = 0, halfHeight = .6, waist = 0, poreHeight = .17;
+  let renderedProgress=NaN,renderedSection=NaN,geometryUpdates=0;
   const stageIndex = () => { let index = 0; catalog.stages.forEach((s, i) => { if (progress >= s.at) index = i; }); return index; };
 
   function updateMembranes() {
     const dock = span(progress, .10, .45), hemi = progress >= .43 && progress < .78;
     topology = progress >= .78 ? 'open-pore' : hemi ? progress < .59 ? 'stalk' : 'hemifusion-diaphragm' : 'separate';
     halfHeight = lerp(isHA ? .65 : .57, .25, dock);
-    waist = hemi ? lerp(.055, .31, span(progress, .43, .77)) : 0;
-    poreRadius = progress >= .78 ? lerp(.045, .48, span(progress, .78, 1)) : 0;
-    poreHeight = lerp(.17, .25, span(progress, .78, .93));
+    waist = hemi ? .31 * span(progress, .43, .77) : 0;
+    poreRadius = progress >= .78 ? lerp(.00002,.48,span(progress, .78, 1)) : 0;
+    poreHeight = .25;
     patches.visible = topology !== 'open-pore'; pore.visible = !patches.visible;
     if (patches.visible) {
       const evals = [];
+      // Before topology changes, draw the local contact dimple continuously.
+      // It prevents the entire centre from teleporting at stalk formation;
+      // no water channel exists while the distal leaflets remain intact.
+      const contact=hemi?1:span(progress,.34,.43);
+      const thinning=span(progress,.59,.78);
       for (const sign of [1, -1]) {
+        const towardPore=(p,u,side,dr)=>{
+          if(thinning===0)return p;
+          const q=porePoint(sign*u,0,poreHeight,side,true),dy=-p.nr/p.ny*dr;
+          const rr=lerp(dr,q.dr*sign,thinning),yy=lerp(dy,q.dy*sign,thinning),outward=side===-1?sign:-sign,length=Math.hypot(rr,yy)||1;
+          return {r:lerp(p.r,q.r,thinning),y:lerp(p.y,q.y,thinning),nr:-yy/length*outward,ny:rr/length*outward};
+        };
         const distal = u => {
           const r = PATCH_RADIUS * u;
-          const f = hemi ? smooth((r - waist) / .55) : 0;
-          return { r, y: sign * (hemi ? HALF_BILAYER + halfHeight * f : halfHeight + HALF_BILAYER) };
+          const q=clamp((r-waist)/.55),f=smooth(q),slope=sign*halfHeight*contact*6*q*(1-q)/.55;
+          return towardPore(radialNormal(r,sign*(HALF_BILAYER+halfHeight*(1-contact+contact*f)),slope,sign),u,-1,PATCH_RADIUS);
         };
         const proximal = u => {
           const r = hemi ? waist + (PATCH_RADIUS - waist) * u : PATCH_RADIUS * u;
-          const f = hemi ? smooth((r - waist) / .55) : 0;
-          return { r, y: sign * (hemi ? (halfHeight - HALF_BILAYER) * f : halfHeight - HALF_BILAYER) };
+          const q=clamp((r-waist)/.55),f=smooth(q),slope=sign*(halfHeight-HALF_BILAYER)*contact*6*q*(1-q)/.55;
+          return towardPore(radialNormal(r,sign*(halfHeight-HALF_BILAYER)*(1-contact+contact*f),slope,-sign),u,1,hemi?PATCH_RADIUS-waist:PATCH_RADIUS);
         };
-        evals.push(u => meridian(distal, u, sign), u => meridian(proximal, u, -sign));
+        evals.push(distal,proximal);
       }
       evals.forEach((e, i) => leaves[i].update(e, section, localTime));
       const start = Math.PI / 2 + section * Math.PI * .43, end = Math.PI / 2 + TAU - section * Math.PI * .43;
@@ -285,6 +351,7 @@ export function createFusionLab({ caseId = 'snare-fusion', detail = true } = {})
         // Match the same physical radius on each side of the cross-section.
         // The interval inside the waist is the intact hemifusion diaphragm.
         const top = u => evals[i * 2](u), bottom = u => {
+          if(thinning>0)return evals[i*2+1](u);
           const r = PATCH_RADIUS * u;
           if (hemi && r < waist) return { r, y: 0 };
           return evals[i * 2 + 1](hemi ? (r - waist) / (PATCH_RADIUS - waist) : u);
@@ -296,10 +363,8 @@ export function createFusionLab({ caseId = 'snare-fusion', detail = true } = {})
       // The bilayer is one continuous hourglass-shaped surface. Offset leaves
       // enclose hydrophobic material; the central r < poreRadius is aqueous.
       const throat = poreRadius + HALF_BILAYER;
-      const medial = u => { const s = u * 2 - 1; return { r: throat + (PATCH_RADIUS - throat) * s * s, y: poreProfile(s, poreHeight).y }; };
       const evaluate = side => u => {
-        const p = meridian(medial, u), nr = -p.nr, ny = -p.ny;
-        return { r: p.r + side * HALF_BILAYER * nr, y: p.y + side * HALF_BILAYER * ny, nr: side * nr, ny: side * ny };
+        return porePoint(u*2-1,poreRadius,poreHeight,side);
       };
       const inner = evaluate(-1), outer = evaluate(1);
       fused[0].update(inner, section, localTime); fused[1].update(outer, section, localTime);
@@ -326,6 +391,9 @@ export function createFusionLab({ caseId = 'snare-fusion', detail = true } = {})
         const u = clamp((r - waist) / .55), f = smooth(u);
         y = sign * (HALF_BILAYER * .5 + (halfHeight - HALF_BILAYER * .5) * f);
         slope = sign * (halfHeight - HALF_BILAYER * .5) * 6 * u * (1 - u) / .55;
+        const thinning=span(progress,.59,.78),s=Math.sqrt(clamp((r-HALF_BILAYER)/(PATCH_RADIUS-HALF_BILAYER))),profile=poreProfile(s,poreHeight);
+        y=lerp(y,sign*profile.y,thinning);
+        slope=lerp(slope,sign*profile.dy/Math.max(.0001,2*s*(PATCH_RADIUS-HALF_BILAYER)),thinning);
       } else { y = sign * halfHeight; slope = 0; }
       const n = V(-slope * Math.cos(angle), 1, -slope * Math.sin(angle)).multiplyScalar(sign).normalize();
       return { point: V(r * Math.cos(angle), y, r * Math.sin(angle)), normal: n };
@@ -401,8 +469,9 @@ export function createFusionLab({ caseId = 'snare-fusion', detail = true } = {})
   }
 
   function render() {
-    if (disposed) return;
+    if (disposed || progress===renderedProgress&&section===renderedSection) return;
     updateMembranes(); updateProteins(); updateTracers();
+    renderedProgress=progress;renderedSection=section;geometryUpdates++;
     group.userData.section = section; group.userData.fusionProgress = progress; group.userData.fusionTopology = topology;
   }
   function seek(value) { progress = clamp(value); localTime = progress * catalog.duration; render(); return getState(); }
@@ -419,7 +488,7 @@ export function createFusionLab({ caseId = 'snare-fusion', detail = true } = {})
     return { caseId, progress, duration: catalog.duration, time: localTime, stageIndex: index, stage: catalog.stages[index], stages: catalog.stages, topology, complete: progress >= 1, section, poreRadius, lumenConnected: topology === 'open-pore', coordinateConvention: isHA ? 'upper=viral interior; gap=endosome lumen; lower=cytosol' : 'upper/lower=organelle lumens; gap=cytosol' };
   }
   function getDiagnostics() {
-    return { ...getState(), pausedWithoutDt: true, realGeometryPore: true, isolatedLipidsPerLeaflet: leaves[0].sites, representedSNAREComplexes: isHA ? 0 : 3, representedHATrimers: isHA ? 3 : 0, physiologicalStoichiometryClaim: false, bilayerThickness: HALF_BILAYER * 2, atomicCoordinatesUsed: false, measuredTrajectory: false, membraneFadingUsed: false, alphaMaterials: [...materials].filter(m => m.transparent || m.opacity < 1).length };
+    return { ...getState(), geometryUpdates, pausedWithoutDt: true, realGeometryPore: true, isolatedLipidsPerLeaflet: leaves[0].sites, representedSNAREComplexes: isHA ? 0 : 3, representedHATrimers: isHA ? 3 : 0, physiologicalStoichiometryClaim: false, bilayerThickness: HALF_BILAYER * 2, atomicCoordinatesUsed: false, measuredTrajectory: false, membraneFadingUsed: false, alphaMaterials: [...materials].filter(m => m.transparent || m.opacity < 1).length };
   }
   function dispose() { if (disposed) return; disposed = true; geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); group.clear(); }
   const anchors = {

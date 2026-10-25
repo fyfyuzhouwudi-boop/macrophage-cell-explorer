@@ -1,9 +1,18 @@
-const VERSION = 1;
+const VERSION = 2;
 const MARKER = "atlasMaterialPreset";
-const FIELDS = ["roughness", "metalness", "envMapIntensity", "bumpScale", "clearcoat", "clearcoatRoughness", "specularIntensity"];
+const FIELDS = ["roughness", "metalness", "envMapIntensity", "bumpScale", "clearcoat", "clearcoatRoughness", "specularIntensity", "transmission"];
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const rules = (roughnessFloor, coatFactor, coatRoughnessFloor, envFactor, envCap, bumpFactor, bumpCap, specularFactor) => Object.freeze({ roughnessFloor, coatFactor, coatRoughnessFloor, envFactor, envCap, bumpFactor, bumpCap, specularFactor });
 const ATLAS_MATERIAL_PRESETS = Object.freeze({
+  exhibition: Object.freeze({
+    film: Object.freeze({...rules(0.46, 0.30, 0.48, 0.8, 0.85, 0.8, 0.015, 0.72),transmissionCap:0.12}),
+    membrane: Object.freeze({...rules(0.53, 0.30, 0.50, 0.82, 0.82, 0.8, 0.014, 0.74),transmissionCap:0.08}),
+    protein: rules(0.56, 0.25, 0.35, 0.95, 0.9, 0.75, 0.008, 0.88),
+    lipidHead: rules(0.42, 0.5, 0.33, 0.95, 0.9, 0.7, 0.003, 0.9),
+    lipidTail: rules(0.62, 0.2, 0.4, 0.9, 0.8, 0.7, 0.002, 0.85),
+    cytoplasm: rules(0.62, 0.25, 0.50, 0.85, 0.85, 0.8, 0.009, 0.72),
+    cargo: rules(0.74, 0.5, 0.45, 1, 1, 0.95, 0.035, 0.95)
+  }),
   conservative: Object.freeze({
     film: rules(0.18, 0.8, 0.16, 0.9, 1.15, 0.75, 0.015, 0.9),
     membrane: rules(0.4, 0.65, 0.3, 0.95, 0.9, 0.65, 0.012, 0.95),
@@ -76,12 +85,13 @@ function snapshot(material) {
 }
 function valuesFor(baseline, rule) {
   const next = { ...baseline };
-  if (Number.isFinite(baseline.roughness) && rule.roughnessFloor !== null) next.roughness = clamp(Math.max(baseline.roughness, rule.roughnessFloor), 0, 1);
+  if (Number.isFinite(baseline.roughness) && rule.roughnessFloor !== null) next.roughness = clamp(Math.max(baseline.roughness * (rule.roughnessScale ?? 1), rule.roughnessFloor), 0, 1);
+  if (Number.isFinite(baseline.transmission) && Number.isFinite(rule.transmissionCap)) next.transmission = Math.min(baseline.transmission, rule.transmissionCap);
   if (Number.isFinite(baseline.metalness)) next.metalness = Math.min(baseline.metalness, 5e-3);
   if (Number.isFinite(baseline.envMapIntensity)) next.envMapIntensity = Math.min(baseline.envMapIntensity * rule.envFactor, rule.envCap);
   if (Number.isFinite(baseline.bumpScale)) next.bumpScale = Math.sign(baseline.bumpScale) * Math.min(Math.abs(baseline.bumpScale) * rule.bumpFactor, rule.bumpCap);
   if (Number.isFinite(baseline.clearcoat) && baseline.clearcoat > 0) {
-    next.clearcoat = Math.max(1e-3, baseline.clearcoat * rule.coatFactor);
+    next.clearcoat = Math.max(rule.coatFloor ?? 1e-3, baseline.clearcoat * rule.coatFactor);
     if (Number.isFinite(baseline.clearcoatRoughness)) next.clearcoatRoughness = Math.max(baseline.clearcoatRoughness, rule.coatRoughnessFloor);
   }
   if (Number.isFinite(baseline.specularIntensity)) next.specularIntensity = baseline.specularIntensity * rule.specularFactor;
@@ -105,7 +115,7 @@ function applyAtlasMaterials(root, { preset = "conservative" } = {}) {
       changed = true;
       changedFields++;
     }
-    if (changed) changedMaterials++;
+    if (changed) { changedMaterials++; material.needsUpdate = true; }
     material.userData[MARKER] = { version: VERSION, applied: true, preset, role, baseline };
     roles[role] = (roles[role] ?? 0) + 1;
     if (entry.roles.size > 1) mixedRoleMaterials.push({ uuid: material.uuid, role, uses: [...entry.roles], names: [...entry.names].slice(0, 5) });

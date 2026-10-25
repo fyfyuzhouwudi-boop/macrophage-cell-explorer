@@ -1,0 +1,1343 @@
+{
+  "schemaVersion": 1,
+  "verifiedDate": "2026-10-25",
+  "language": "zh-CN",
+  "scope": "当前src源码入口与可播放动作盘点；不等于实际浏览器验收报告。动态ID为文档索引，不是新增app API。",
+  "auditMethod": {
+    "searched": "rg timed update/onUpdate/setProgress/seek/motion plus lesson catalogs across src/*.js excluding generated data",
+    "clockEntry": "src/main.js animate",
+    "lessonCatalogs": [
+      "STEADY_TOPICS + LESSONS",
+      "UPTAKE_CASES + UPTAKE_STAGES",
+      "FUSION_CATALOG",
+      "VIRAL_STAGES + VIRAL_RESPONSE_SUBSTEPS"
+    ],
+    "notCountedAsBiologicalAnimation": [
+      "相机平移旋转/焦点过渡",
+      "剖切平面更新",
+      "材质/LOD/质量切换",
+      "文字标注和UI刷新",
+      "静态PDB坐标观察"
+    ]
+  },
+  "processes": [
+    {
+      "id": "cooperation.synthesis",
+      "title": "合成与分选",
+      "kind": "causal-mechanism-lesson",
+      "entry": "生命过程 → 日常协作 → 合成与分选 → 侧栏五步骤 / 播放 / 演示进度",
+      "clock": "40秒归一化教学时间，每段五步；进度可倒拖",
+      "stages": [
+        {
+          "id": "cooperation.synthesis.er-synthesis",
+          "title": "在粗面内质网合成",
+          "at": 0,
+          "input": "进入分泌途径的新生肽链",
+          "action": "核糖体在膜的胞质侧翻译，所选肽链进入 ER 腔",
+          "result": "可继续折叠和加工的腔内蛋白",
+          "boundary": "蛋白链是粗化示意；本课不表示所有蛋白都在粗面 ER 合成。"
+        },
+        {
+          "id": "cooperation.synthesis.er-export",
+          "title": "衣被募集与出芽",
+          "at": 0.2,
+          "input": "ER 腔内的选定蛋白",
+          "action": "COPII 衣被募集，芽体膜颈收窄，载体分离后离开",
+          "result": "货物留在独立载体腔内",
+          "boundary": "衣被与膜颈为粗化示意；ERGIC 及进入 Golgi 的融合未逐一绘制。"
+        },
+        {
+          "id": "cooperation.synthesis.golgi-processing",
+          "title": "高尔基体继续加工",
+          "at": 0.4,
+          "input": "ER 输出的同一类货物",
+          "action": "货物进入 Golgi 加工与分选阶段",
+          "result": "准备送往选定目的地的货物",
+          "boundary": "本课选择送往细胞表面的分泌通路；不将五个扁囊当成五次固定化学反应。"
+        },
+        {
+          "id": "cooperation.synthesis.secretory-transport",
+          "title": "分选后再次运输",
+          "at": 0.6,
+          "input": "Golgi 输出的分泌货物",
+          "action": "一件可辨认的货物随膜性载体靠近细胞表面",
+          "result": "待交付的分泌载体",
+          "boundary": "方向提示只说明所选目的地；不是细胞器之间的固定导管。"
+        },
+        {
+          "id": "cooperation.synthesis.secretion",
+          "title": "开孔并释放到胞外",
+          "at": 0.8,
+          "input": "含分泌货物的载体",
+          "action": "膜靠近并打开融合孔，货物在孔扩大后经过孔到达胞外",
+          "result": "载体腔与胞外连通",
+          "boundary": "SNARE 是通用装配原理示意；不指定巨噬细胞唯一组合。保留 Ω 形膜轮廓观察，后续回平与回收省略。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/steady-lesson-tableaux.js",
+          "src/steady-synthesis-detail.js",
+          "src/steady-lesson-controls.js"
+        ],
+        "symbol": "LESSONS[0]; buildSynthesisLesson.update; motion",
+        "references": [
+          {
+            "title": "Barlowe et al. 1994 · COPII vesicle formation",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/8004676/"
+          },
+          {
+            "title": "Schnitzer & Block 1997 · ATP-coupled kinesin stepping",
+            "url": "https://www.nature.com/articles/41111"
+          },
+          {
+            "title": "Dunn et al. 1989 · Recycling / degradative cargo sorting",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/2600137/"
+          },
+          {
+            "title": "Alberts et al. · ER through Golgi",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
+        ]
+      },
+      "teachingScope": "沿同一件分泌蛋白货物，观察粗面内质网、运输载体、高尔基体和细胞表面的交接。 局部教学重排，非整胞原位坐标；各步省略项见boundary。"
+    },
+    {
+      "id": "cooperation.transport",
+      "title": "能量与运输",
+      "kind": "causal-mechanism-lesson",
+      "entry": "生命过程 → 日常协作 → 能量与运输 → 侧栏五步骤 / 播放 / 演示进度",
+      "clock": "40秒归一化教学时间，每段五步；进度可倒拖",
+      "stages": [
+        {
+          "id": "cooperation.transport.atp-regeneration",
+          "title": "先区分供能与运输",
+          "at": 0,
+          "input": "ADP、无机磷酸及代谢能量",
+          "action": "线粒体氧化磷酸化是 ATP 再生的一条重要途径",
+          "result": "可供胞内反应使用的 ATP",
+          "boundary": "胞质糖酵解也可产生 ATP；图中不是从线粒体发出一列运输颗粒。"
+        },
+        {
+          "id": "cooperation.transport.motor-binding",
+          "title": "马达连接载体与轨道",
+          "at": 0.2,
+          "input": "膜性载体、马达和微管",
+          "action": "选定的双头 kinesin 示意一端结合微管，尾部连接货物",
+          "result": "轨道—马达—载体形成机械联系",
+          "boundary": "采用 kinesin 代表性局部；不代表所有载体只用一种马达。"
+        },
+        {
+          "id": "cooperation.transport.motor-cycle",
+          "title": "ATP 循环驱动换步",
+          "at": 0.4,
+          "input": "马达结合的 ATP",
+          "action": "ATP 结合、水解和产物释放与头部结合状态和构象耦联",
+          "result": "两头交替前移，载体随之移动",
+          "boundary": "动作减速并放大；没有按屏幕尺寸或节拍表示真实 8 nm 与酶速率。"
+        },
+        {
+          "id": "cooperation.transport.cargo-advance",
+          "title": "载体沿微管前进",
+          "at": 0.6,
+          "input": "仍被膜包裹的同一件货物",
+          "action": "马达持续换步，载体沿选定轨道方向移位",
+          "result": "货物在胞质中改变位置",
+          "boundary": "微管是轨道，不是内装货物的运输管；马达可调控、停顿或换向。"
+        },
+        {
+          "id": "cooperation.transport.transport-result",
+          "title": "看清三种不同角色",
+          "at": 0.8,
+          "input": "供能系统、轨道与马达",
+          "action": "ATP 提供化学自由能，微管提供结合轨道，马达把化学循环耦联到运动",
+          "result": "载体被搬运；它没有变成 ATP",
+          "boundary": "终点是所选运输片段的终点，不指定为某一个细胞器的固定交付地址。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/steady-lesson-tableaux.js",
+          "src/steady-transport-detail.js",
+          "src/steady-lesson-controls.js"
+        ],
+        "symbol": "LESSONS[1]; buildTransportLesson.update; motion",
+        "references": [
+          {
+            "title": "Barlowe et al. 1994 · COPII vesicle formation",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/8004676/"
+          },
+          {
+            "title": "Schnitzer & Block 1997 · ATP-coupled kinesin stepping",
+            "url": "https://www.nature.com/articles/41111"
+          },
+          {
+            "title": "Dunn et al. 1989 · Recycling / degradative cargo sorting",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/2600137/"
+          },
+          {
+            "title": "Alberts et al. · ER through Golgi",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
+        ]
+      },
+      "teachingScope": "把供能与运动分开看：线粒体参与再生 ATP，马达利用 ATP 水解循环带动载体沿微管前进。 局部教学重排，非整胞原位坐标；各步省略项见boundary。"
+    },
+    {
+      "id": "cooperation.recycling",
+      "title": "回收与降解",
+      "kind": "causal-mechanism-lesson",
+      "entry": "生命过程 → 日常协作 → 回收与降解 → 侧栏五步骤 / 播放 / 演示进度",
+      "clock": "40秒归一化教学时间，每段五步；进度可倒拖",
+      "stages": [
+        {
+          "id": "cooperation.recycling.endosomal-input",
+          "title": "受体与货物已进入内体",
+          "at": 0,
+          "input": "膜上的受体与腔内货物",
+          "action": "从已经内化的状态观察它们的不同位置",
+          "result": "绿色受体在膜上，橙色货物在腔内",
+          "boundary": "本段不重复摄取膜内陷；受体和腔内货物不是同一种小球。"
+        },
+        {
+          "id": "cooperation.recycling.sorting-choice",
+          "title": "在内体分开去向",
+          "at": 0.2,
+          "input": "一项可回收受体及可降解货物的教学选择",
+          "action": "受体进入回收方向，腔内货物留在处理方向",
+          "result": "形成上方回收与下方降解两条支路",
+          "boundary": "这是选定命运组合；部分膜受体也可能被送往降解。"
+        },
+        {
+          "id": "cooperation.recycling.receptor-recycling",
+          "title": "把受体送回表面",
+          "at": 0.4,
+          "input": "回收载体膜上的绿色受体",
+          "action": "受体随回收途径返回细胞表面",
+          "result": "受体重新位于表面膜，橙色货物没有随行",
+          "boundary": "回收内体及载体膜融合细节作分段交接；不得把全部内体内容倒回胞外。"
+        },
+        {
+          "id": "cooperation.recycling.degradative-delivery",
+          "title": "腔内货物继续被处理",
+          "at": 0.6,
+          "input": "留在降解方向的橙色货物",
+          "action": "经内体成熟及与降解区室的交流，货物进入酸性水解环境",
+          "result": "可降解货物位于降解腔内",
+          "boundary": "晚期内体、融合和区室动态在这里压缩表达；不是一根内体直通溶酶体的管。"
+        },
+        {
+          "id": "cooperation.recycling.degradation",
+          "title": "水解酶接触并切断底物",
+          "at": 0.8,
+          "input": "降解腔内的同一件蛋白货物",
+          "action": "底物接近水解酶沟槽，肽链连接逐段断开并分离",
+          "result": "表面保留回收受体，降解腔内出现小肽片段",
+          "boundary": "以组织蛋白酶 B 型双叶结构为粗化实例，未重建原子坐标、催化残基或完整反应动力学。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/steady-lesson-tableaux.js",
+          "src/steady-recycling-detail.js",
+          "src/steady-lesson-controls.js"
+        ],
+        "symbol": "LESSONS[2]; buildRecyclingLesson.update; motion",
+        "references": [
+          {
+            "title": "Barlowe et al. 1994 · COPII vesicle formation",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/8004676/"
+          },
+          {
+            "title": "Schnitzer & Block 1997 · ATP-coupled kinesin stepping",
+            "url": "https://www.nature.com/articles/41111"
+          },
+          {
+            "title": "Dunn et al. 1989 · Recycling / degradative cargo sorting",
+            "url": "https://pubmed.ncbi.nlm.nih.gov/2600137/"
+          },
+          {
+            "title": "Alberts et al. · ER through Golgi",
+            "url": "https://www.ncbi.nlm.nih.gov/books/NBK26941/"
+          }
+        ]
+      },
+      "teachingScope": "同一次分选有不同去向：膜受体返回表面，选定的腔内货物继续进入降解途径。 局部教学重排，非整胞原位坐标；各步省略项见boundary。"
+    },
+    {
+      "id": "uptake.particle-phagocytosis",
+      "title": "大颗粒吞噬",
+      "kind": "causal-mechanism-lesson",
+      "entry": "生命过程 → 摄取外物 → 更多案例与过程说明 → 大颗粒吞噬；返回整胞 / 跟随颗粒切换局部",
+      "clock": "48秒主教学进度",
+      "stages": [
+        {
+          "id": "uptake.particle-phagocytosis.0",
+          "title": "已调理颗粒与膜接触",
+          "at": 0,
+          "action": "IgG调理的多价非病毒蛋白颗粒接近连续局部膜；Fab朝颗粒，Fc朝外。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.particle-phagocytosis.1",
+          "title": "受体侧移与膜杯生长",
+          "at": 0.08,
+          "action": "FcγR沿真实连续膜侧移至接触区；胞质侧actin伴随膜弯曲包裹。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.particle-phagocytosis.2",
+          "title": "保持连通的薄颈收窄",
+          "at": 0.46,
+          "action": "杯与背景膜仍共用索引，杯腔经真实开口连胞外，颈口逐渐收窄。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.particle-phagocytosis.3",
+          "title": "瞬时裂分与封闭运输",
+          "at": 0.62,
+          "action": "有限薄颈处瞬时切换为封闭吞噬体和闭合母膜，随后运输。",
+          "boundary": "展示瞬时拓扑裂分事件；未模拟裂分蛋白、脂双层叶级过程或真实流体力学。"
+        },
+        {
+          "id": "uptake.particle-phagocytosis.4",
+          "title": "封闭腔内处理与残余",
+          "at": 0.82,
+          "action": "大货物留在处理腔，可保留残余；不走受体回收支路。",
+          "boundary": "后续酶递送与供体融合在此局部仍作状态简化。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/uptake-scenario.js",
+          "src/uptake-controls.js",
+          "src/a-continuous-route.js"
+        ],
+        "symbol": "UPTAKE_CASES; UPTAKE_STAGES; updateA/updateB; getTeachingState",
+        "references": []
+      },
+      "teachingScope": "IgG-FcγR介导的代表性大颗粒吞噬，连续膜杯、有限颈部瞬时裂分、酸化符号、腔内切键；酶递送/供体融合仍省略。"
+    },
+    {
+      "id": "uptake.mannose-receptor-endocytosis",
+      "title": "可溶配体摄取",
+      "kind": "causal-mechanism-lesson",
+      "entry": "生命过程 → 摄取外物 → 更多案例与过程说明 → 可溶配体摄取；返回整胞 / 跟随颗粒切换局部",
+      "clock": "48秒主教学进度",
+      "stages": [
+        {
+          "id": "uptake.mannose-receptor-endocytosis.0",
+          "title": "可溶糖蛋白与MR",
+          "at": 0,
+          "action": "具MR活性的细胞，摄取末端甘露糖糖蛋白；不是游离单糖或大颗粒。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.mannose-receptor-endocytosis.1",
+          "title": "封闭小载体",
+          "at": 0.2,
+          "action": "受体结合域朝载体腔，短尾仍朝胞质。",
+          "boundary": "出芽、膜颈切断以及随后与内体的融合以阶段交接省略。"
+        },
+        {
+          "id": "uptake.mannose-receptor-endocytosis.2",
+          "title": "同膜上的分流",
+          "at": 0.38,
+          "action": "MR沿限制膜进入真正连通的回收管；可溶配体留在体部腔内。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.mannose-receptor-endocytosis.3",
+          "title": "回收膜与处理方向",
+          "at": 0.68,
+          "action": "受体随膜载体回收；配体另处于处理区室。",
+          "boundary": "回收管颈裂分与配体后续递送省略；前后保留身份与膜侧向。"
+        },
+        {
+          "id": "uptake.mannose-receptor-endocytosis.4",
+          "title": "受体回膜，配体处理",
+          "at": 0.86,
+          "action": "左侧MR恢复表面结合朝向，右侧配体留在处理腔。",
+          "boundary": "回收载体与质膜融合过程省略；不是受体穿过胞质游回去。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/uptake-scenario.js",
+          "src/uptake-controls.js",
+          "src/a-continuous-route.js"
+        ],
+        "symbol": "UPTAKE_CASES; UPTAKE_STAGES; updateA/updateB; getTeachingState",
+        "references": []
+      },
+      "teachingScope": "MR与可溶糖蛋白结合、内化状态交接、同膜分选、受体回收和货物处理；多个出芽/裂分/融合中间态省略。"
+    },
+    {
+      "id": "uptake.viral-antigen-clearance",
+      "title": "病毒相关抗原清除",
+      "kind": "causal-mechanism-lesson",
+      "entry": "生命过程 → 摄取外物 → 更多案例与过程说明 → 病毒相关抗原清除；返回整胞 / 跟随颗粒切换局部",
+      "clock": "48秒主教学进度",
+      "stages": [
+        {
+          "id": "uptake.viral-antigen-clearance.0",
+          "title": "IgG调理的抗原载体接触",
+          "at": 0,
+          "action": "限定为带病毒相关抗原的非感染性教学载体，预先由IgG调理；不是通用病毒颗粒的入侵或感染。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.viral-antigen-clearance.1",
+          "title": "FcγR识别IgG-Fc并包裹",
+          "at": 0.08,
+          "action": "FcγR识别载体表面IgG的Fc端，沿膜侧移配对；胞质侧actin伴随共享膜杯包裹。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.viral-antigen-clearance.2",
+          "title": "抗原载体杯颈保持连通",
+          "at": 0.46,
+          "action": "膜杯、细颈和背景膜共索引；杯腔仍连胞外。抗原载体未穿膜进入胞质。",
+          "boundary": null
+        },
+        {
+          "id": "uptake.viral-antigen-clearance.3",
+          "title": "显式裂分与封闭抗原载体",
+          "at": 0.62,
+          "action": "有限薄颈处瞬时切换为封闭吞噬体与母膜，载体留在腔内运输。",
+          "boundary": "显式瞬时拓扑事件；裂分蛋白、脂双层叶级过程与流体力学未模拟。"
+        },
+        {
+          "id": "uptake.viral-antigen-clearance.4",
+          "title": "抗原载体的腔内处理",
+          "at": 0.82,
+          "action": "只展示非感染性载体在封闭腔内被处理与残余；不表示病毒复制、逃逸或有效感染。",
+          "boundary": "后续酶递送仍简化；此路线不通向胞质RNA。病毒应答中的胞质RNA仍是独立条件支路。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/uptake-scenario.js",
+          "src/uptake-controls.js",
+          "src/a-continuous-route.js"
+        ],
+        "symbol": "UPTAKE_CASES; UPTAKE_STAGES; updateA/updateB; getTeachingState",
+        "references": []
+      },
+      "teachingScope": "IgG调理的非感染性病毒相关抗原载体清除；不表示有效感染，不接到胞质RNA。"
+    },
+    {
+      "id": "virus.response",
+      "title": "细胞抗病毒应答",
+      "kind": "conditional-pathway-lesson",
+      "entry": "生命过程 → 病毒响应 → 细胞抗病毒应答 → 六大阶段；图上子步骤",
+      "clock": "64秒主教学进度；阶段和子步骤均可定位",
+      "stages": [
+        {
+          "id": "virus.response.particle",
+          "title": "胞外颗粒与宿主膜",
+          "at": 0,
+          "phase": 0,
+          "input": "胞外包膜颗粒",
+          "action": "接近并被摄取；受体条件依颗粒与细胞而变",
+          "result": "颗粒被膜围住，与胞质隔开",
+          "boundary": "摄取不等于成功感染；内陷和断颈用状态交接，未模拟。"
+        },
+        {
+          "id": "virus.response.endosomal-processing",
+          "title": "内体腔内处理",
+          "at": 0.16,
+          "phase": 1,
+          "input": "膜包围的颗粒",
+          "action": "内体运输与颗粒组分分解",
+          "result": "残余片段仍在膜内",
+          "boundary": "内体不直接改称溶酶体；片段不会自动变为胞质病毒 RNA。"
+        },
+        {
+          "id": "virus.response.cytosolic-recognition",
+          "title": "RIG-I 识别合适的 RNA",
+          "at": 0.32,
+          "phase": 2,
+          "input": "可识别 RNA 已在胞质",
+          "action": "RIG-I 结合 RNA，并露出信号相关 CARD 区域",
+          "result": "具备启动 MAVS 支路的条件",
+          "boundary": "独立条件支路；不表示前段内体自动泄漏，也不是所有病毒的唯一传感器。"
+        },
+        {
+          "id": "virus.response.MAVS",
+          "title": "MAVS 在外膜侧组装信号",
+          "at": 0.38,
+          "phase": 2,
+          "input": "RIG-I 相关信号",
+          "action": "MAVS 信号域组装，衔接下游因子",
+          "result": "向下游激酶网络传递活化",
+          "boundary": "亚基数和大小为教学表达；不是线粒体内部的运输颗粒。"
+        },
+        {
+          "id": "virus.response.TBK1-activation",
+          "title": "下游激酶活化 IRF3",
+          "at": 0.445,
+          "phase": 2,
+          "input": "MAVS 下游信号网络",
+          "action": "以 TBK1 为例，显示 IRF3 磷酸化状态",
+          "result": "活化 IRF3 可参与核内基因调控",
+          "boundary": "TRAF/NEMO 等中间反应省略；不表示 MAVS 直接结合 TBK1 或唯一活化地点。"
+        },
+        {
+          "id": "virus.response.IRF3-transport",
+          "title": "活化 IRF3 经核孔入核",
+          "at": 0.49,
+          "phase": 3,
+          "input": "活化的宿主 IRF3",
+          "action": "通过核孔，到达核内调控环境",
+          "result": "参与 IFNB1 表达调控",
+          "boundary": "蛋白运动是教学路线，非实测轨迹；IRF3 不是病毒 RNA。"
+        },
+        {
+          "id": "virus.response.nuclear-transcription",
+          "title": "宿主 IFNB1 基因转录",
+          "at": 0.616,
+          "phase": 3,
+          "input": "IRF3 与协同调控因子",
+          "action": "共同调控转录机器，生成宿主 RNA",
+          "result": "出现 IFNB1 转录本",
+          "boundary": "核内 DNA 与蛋白为比例调整的教学图；IRF3 不是唯一必需因子。"
+        },
+        {
+          "id": "virus.response.mRNA-to-ER",
+          "title": "宿主 mRNA 输出并接入翻译",
+          "at": 0.65,
+          "phase": 4,
+          "input": "宿主 IFNB1 mRNA",
+          "action": "输出到胞质，接入内质网相关翻译",
+          "result": "为合成分泌蛋白提供模板",
+          "boundary": "mRNA 留在胞质侧，不进入内质网腔；此路径不是病毒基因组运输。"
+        },
+        {
+          "id": "virus.response.ER-translation",
+          "title": "在粗面内质网上合成 IFN-β",
+          "at": 0.668,
+          "phase": 4,
+          "input": "宿主 mRNA 与核糖体",
+          "action": "肽链经转位通道进入内质网腔",
+          "result": "形成腔内分泌蛋白 IFN-β",
+          "boundary": "膜通道有真实几何开口；此为比例调整的局部图，非原子结构。"
+        },
+        {
+          "id": "virus.response.Golgi-processing",
+          "title": "高尔基腔内处理与分选",
+          "at": 0.693,
+          "phase": 4,
+          "input": "分泌途径中的宿主 IFN-β",
+          "action": "用剖面显示腔内货物与后续分选",
+          "result": "进入面向细胞表面的分泌载体",
+          "boundary": "各腔货物是顺序状态；区室间出芽和膜融合未逐分子重建，不画闭囊泡穿膜。"
+        },
+        {
+          "id": "virus.response.secretory-carrier",
+          "title": "分泌载体在胞质中运输",
+          "at": 0.728,
+          "phase": 4,
+          "input": "载体腔内的 IFN-β",
+          "action": "闭合膜载体向细胞表面运输",
+          "result": "货物保持在载体腔内，准备胞吐",
+          "boundary": "路线调整以便观察，不是实测距离或速度；IFN-β 不是病毒或抗体。"
+        },
+        {
+          "id": "virus.response.exocytosis",
+          "title": "胞吐孔让腔内货物通向胞外",
+          "at": 0.785,
+          "phase": 4,
+          "input": "载体腔内的宿主 IFN-β",
+          "action": "开放胞吐孔中，腔内货物沿孔口释放",
+          "result": "IFN-β 出现在细胞外",
+          "boundary": "显示连续 omega 膜与开放孔局部状态；早期对接/融合蛋白种类及动力学未重建。"
+        },
+        {
+          "id": "virus.response.released-IFN",
+          "title": "胞外 IFN-β 传递宿主信号",
+          "at": 0.815,
+          "phase": 4,
+          "input": "已释放的宿主 IFN-β",
+          "action": "在胞外扩散，可作用于自身或邻近细胞",
+          "result": "为 IFNAR 受体结合提供配体",
+          "boundary": "小颗粒是信号蛋白；不是子代病毒，不表示病毒被直接杀死。"
+        },
+        {
+          "id": "virus.response.approaching-IFN",
+          "title": "IFN-β 接近膜外受体",
+          "at": 0.845,
+          "phase": 5,
+          "input": "胞外宿主 IFN-β",
+          "action": "选定配体接近 IFNAR2 胞外区域",
+          "result": "准备组成受体信号复合体",
+          "boundary": "这是宿主配体结合，不是病毒入侵，也不是膜融合。"
+        },
+        {
+          "id": "virus.response.IFNAR-extracellular-assembly",
+          "title": "IFNAR1/2 在膜上组装",
+          "at": 0.86,
+          "phase": 5,
+          "input": "IFN-β 与受体亚基",
+          "action": "配体结合促进 IFNAR1/2 受体复合体形成",
+          "result": "胞外结合与胞质侧信号衔接",
+          "boundary": "有限横向移动为教学表达，受体始终保持膜锚定。"
+        },
+        {
+          "id": "virus.response.IFNAR-cytosolic-JAK",
+          "title": "胞质侧激酶改变 STAT 状态",
+          "at": 0.885,
+          "phase": 5,
+          "input": "已组装的 IFNAR 复合体",
+          "action": "JAK1/TYK2 相关信号使 STAT1/2 磷酸化",
+          "result": "STAT 核内响应所需状态改变",
+          "boundary": "橙色小点是附着的磷酸化状态标记，不是自由运输颗粒。"
+        },
+        {
+          "id": "virus.response.STAT-transport",
+          "title": "STAT1/2 经核孔入核",
+          "at": 0.915,
+          "phase": 5,
+          "input": "活化的 STAT1/STAT2",
+          "action": "观察其入核教学路径",
+          "result": "与 IRF9 共同参与核内基因调控",
+          "boundary": "不声称全部 ISGF3 都已在胞质装配完成；巨噬细胞也支持在 DNA 上组装的模型。"
+        },
+        {
+          "id": "virus.response.ISG-transcription",
+          "title": "核内启动 ISG 表达",
+          "at": 0.963,
+          "phase": 5,
+          "input": "STAT1/STAT2 与 IRF9",
+          "action": "在调控 DNA 环境中共同促进宿主转录",
+          "result": "形成宿主 ISG 转录产物",
+          "boundary": "ISRE/DNA 与蛋白为教学符号；不是特定基因的真实位置或测得构象。"
+        },
+        {
+          "id": "virus.response.induced-products",
+          "title": "宿主应答产物增强防御",
+          "at": 0.985,
+          "phase": 5,
+          "input": "ISG 表达及后续翻译",
+          "action": "产生具有不同防御功能的宿主产物",
+          "result": "可限制病毒 RNA、翻译或复制等环节",
+          "boundary": "此形状不指定一种蛋白；实际功能依产物与病毒而异，不保证清除所有病毒。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/viral-atlas.js",
+          "src/response-lesson-data.js",
+          "src/response-production.js",
+          "src/classroom-response.js"
+        ],
+        "symbol": "VIRAL_STAGES; VIRAL_RESPONSE_SUBSTEPS; apply; createResponseProduction.update",
+        "references": []
+      },
+      "teachingScope": "六大段19子步骤。摄取、内体内处理与需要胞质RNA已存在的RIG-I支路分开；IFNAR组装、JAK/STAT及ISG为宿主应答，不能保证清除所有病毒。"
+    },
+    {
+      "id": "fusion.snare-fusion",
+      "title": "SNARE 膜融合",
+      "kind": "independent-local-fusion-lesson",
+      "entry": "生命过程说明区 → 进入膜融合微观现场 → 囊泡融合 · SNARE 拉链；细胞图谱亦有代表实例入口",
+      "clock": "24秒局部独立时间；从头播放 / 六阶段 / 反应进度",
+      "stages": [
+        {
+          "id": "fusion.snare-fusion.0",
+          "title": "识别与靠近",
+          "at": 0,
+          "action": "两层独立的脂质双层仍分隔各自腔室。系留与调控因子未逐一绘制；放大展示跨膜锚和胞质侧 SNARE。"
+        },
+        {
+          "id": "fusion.snare-fusion.1",
+          "title": "从 N 端开始拉链化",
+          "at": 0.16,
+          "action": "STX7、VTI1B、STX8 与 VAMP7 的 SNARE 基序配对成四螺旋束，装配向膜近端推进。蛋白质的跨膜段仍锚定原膜。"
+        },
+        {
+          "id": "fusion.snare-fusion.2",
+          "title": "近端单层形成融合柄",
+          "at": 0.43,
+          "action": "相向的两片胞质侧单层建立连续连接。远端单层尚未开孔，腔内容物不能通过。几何切换表示拓扑事件，不是逐原子的实测轨迹。"
+        },
+        {
+          "id": "fusion.snare-fusion.3",
+          "title": "半融合隔膜",
+          "at": 0.59,
+          "action": "接触区扩大：近端单层已经相连，两个远端单层构成仍然封闭的隔膜。此处采用一种常用融合路径，并非所有事件都可分辨出长寿命隔膜。"
+        },
+        {
+          "id": "fusion.snare-fusion.4",
+          "title": "水性融合孔开放",
+          "at": 0.78,
+          "action": "隔膜中央出现真实几何开口，双层沿孔缘连续转弯。只有孔打开后，腔内示踪颗粒才穿过；颜色代表来源，非永久不混合边界。"
+        },
+        {
+          "id": "fusion.snare-fusion.5",
+          "title": "孔扩张与腔室连通",
+          "at": 0.91,
+          "action": "孔径扩张，两侧腔室相通。演示到此停止；SNARE 的 NSF / α-SNAP 解离回收和后续形态变化未纳入本段。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/fusion-lab.js",
+          "src/detail-learning-controls.js"
+        ],
+        "symbol": "FUSION_CATALOG; updateMembranes; updateProteins; updateTracers",
+        "references": [
+          {
+            "title": "Ward et al., 2000 · 肺泡巨噬细胞的 STX7 / VAMP7 融合实验",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC14922/"
+          },
+          {
+            "title": "Pryor et al., 2004 · 晚期内体–溶酶体 SNARE 配对",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1299070/"
+          },
+          {
+            "title": "Sharma & Lindau, 2018 · SNARE 融合孔的分子模拟",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6294955/"
+          }
+        ]
+      },
+      "teachingScope": "模型依据实验支持的蛋白配对及膜拓扑绘制；蛋白轮廓、数量、速度和尺寸经过教学处理，非原子坐标或某一次细胞事件重建。SNARE 拉链的详细轨迹借鉴通用机制，未宣称是该组合的实测运动。 膜间是胞质、外侧是两个腔室；不展示NSF/α-SNAP回收。"
+    },
+    {
+      "id": "fusion.ha-fusion",
+      "title": "HA 病毒膜融合",
+      "kind": "independent-local-fusion-lesson",
+      "entry": "生命过程说明区 → 进入膜融合微观现场 → 病毒包膜融合 · 流感 HA；细胞图谱亦有代表实例入口",
+      "clock": "25秒局部独立时间；从头播放 / 六阶段 / 反应进度",
+      "stages": [
+        {
+          "id": "fusion.ha-fusion.0",
+          "title": "内化后的病毒包膜",
+          "at": 0,
+          "action": "本段从已进入内体的流感样包膜颗粒开始。上方为病毒包膜，下方为内体限制膜，中间间隙为内体腔；并非细胞表面的吞噬杯。"
+        },
+        {
+          "id": "fusion.ha-fusion.1",
+          "title": "低 pH 激活与伸展",
+          "at": 0.16,
+          "action": "合适的酸化条件触发已经成熟的 HA 三聚体重排。HA2 的融合肽暴露并插入靶膜的内体腔侧单层；HA 跨膜段仍留在病毒包膜。"
+        },
+        {
+          "id": "fusion.ha-fusion.2",
+          "title": "HA2 折返并拉近双膜",
+          "at": 0.43,
+          "action": "HA2 向折返构象重排，让融合肽和跨膜锚接近。被拉近的是病毒包膜与内体限制膜；结合、内化和融合是不同步骤。"
+        },
+        {
+          "id": "fusion.ha-fusion.3",
+          "title": "融合柄与半融合",
+          "at": 0.59,
+          "action": "近端单层形成连续膜结构，远端单层仍分隔病毒内部与细胞质。采用冷冻电镜支持的一类中间态示意，未把它当作唯一必经轨迹。"
+        },
+        {
+          "id": "fusion.ha-fusion.4",
+          "title": "融合孔连通",
+          "at": 0.78,
+          "action": "开口连通病毒内部与细胞质，孔缘为连续脂质双层。小粒子仅标示水性连通，不代表真实病毒核糖核蛋白的解包或穿孔动力学。"
+        },
+        {
+          "id": "fusion.ha-fusion.5",
+          "title": "融合后的条件性通路",
+          "at": 0.91,
+          "action": "膜融合不等于成功复制。本段不预测巨噬细胞是否支持某种流感毒株的生产性感染，也不把 HA 机制泛化到所有病毒。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/fusion-lab.js",
+          "src/detail-learning-controls.js"
+        ],
+        "symbol": "FUSION_CATALOG; updateMembranes; updateProteins; updateTracers",
+        "references": [
+          {
+            "title": "Benton et al., 2020 · HA 低 pH 构象的冷冻电镜",
+            "url": "https://www.nature.com/articles/s41586-020-2333-6"
+          },
+          {
+            "title": "Calder & Rosenthal, 2016 · 流感膜融合的冷冻电镜断层",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6485592/"
+          },
+          {
+            "title": "PDB 6Y5H · HA 实验结构与关联状态",
+            "url": "https://www.rcsb.org/structure/6Y5H"
+          }
+        ]
+      },
+      "teachingScope": "参考冷冻电镜构象与断层膜轮廓绘制，未下载或插值实验原子坐标。HA1 头部运动和中间态间的连接是教学插值；该路径并非所有包膜病毒共有。 从已内化病毒开始；不代表全部病毒或生产性感染。"
+    },
+    {
+      "id": "virus.ha-entry",
+      "title": "膜蛋白变化 · 流感HA示例",
+      "kind": "classroom-adapter-of-existing-fusion-model",
+      "entry": "生命过程 → 病毒响应 → 膜蛋白变化",
+      "clock": "25秒主教学进度；六阶段与局部HA模型相同",
+      "sharedModelWith": "fusion.ha-fusion",
+      "stages": [
+        {
+          "id": "virus.ha-entry.0",
+          "title": "内化后的病毒包膜",
+          "at": 0,
+          "action": "本段从已进入内体的流感样包膜颗粒开始。上方为病毒包膜，下方为内体限制膜，中间间隙为内体腔；并非细胞表面的吞噬杯。"
+        },
+        {
+          "id": "virus.ha-entry.1",
+          "title": "低 pH 激活与伸展",
+          "at": 0.16,
+          "action": "合适的酸化条件触发已经成熟的 HA 三聚体重排。HA2 的融合肽暴露并插入靶膜的内体腔侧单层；HA 跨膜段仍留在病毒包膜。"
+        },
+        {
+          "id": "virus.ha-entry.2",
+          "title": "HA2 折返并拉近双膜",
+          "at": 0.43,
+          "action": "HA2 向折返构象重排，让融合肽和跨膜锚接近。被拉近的是病毒包膜与内体限制膜；结合、内化和融合是不同步骤。"
+        },
+        {
+          "id": "virus.ha-entry.3",
+          "title": "融合柄与半融合",
+          "at": 0.59,
+          "action": "近端单层形成连续膜结构，远端单层仍分隔病毒内部与细胞质。采用冷冻电镜支持的一类中间态示意，未把它当作唯一必经轨迹。"
+        },
+        {
+          "id": "virus.ha-entry.4",
+          "title": "融合孔连通",
+          "at": 0.78,
+          "action": "开口连通病毒内部与细胞质，孔缘为连续脂质双层。小粒子仅标示水性连通，不代表真实病毒核糖核蛋白的解包或穿孔动力学。"
+        },
+        {
+          "id": "virus.ha-entry.5",
+          "title": "融合后的条件性通路",
+          "at": 0.91,
+          "action": "膜融合不等于成功复制。本段不预测巨噬细胞是否支持某种流感毒株的生产性感染，也不把 HA 机制泛化到所有病毒。"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/viral-entry-sequence.js",
+          "src/viral-entry-curvature.js",
+          "src/fusion-lab.js"
+        ],
+        "symbol": "createViralEntrySequence; createViralEntryCurvature; FUSION_CATALOG.ha-fusion",
+        "references": [
+          {
+            "title": "Benton et al., 2020 · HA 低 pH 构象的冷冻电镜",
+            "url": "https://www.nature.com/articles/s41586-020-2333-6"
+          },
+          {
+            "title": "Calder & Rosenthal, 2016 · 流感膜融合的冷冻电镜断层",
+            "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6485592/"
+          },
+          {
+            "title": "PDB 6Y5H · HA 实验结构与关联状态",
+            "url": "https://www.rcsb.org/structure/6Y5H"
+          }
+        ]
+      },
+      "teachingScope": "周边病毒包膜和内体限制膜弯曲，中央HA动作与真实开孔拓扑复用；尺寸/时间/曲率是教学构图，非原子坐标插值。青绿示踪球只代表水相连通。"
+    },
+    {
+      "id": "membrane.fcgr-binding",
+      "title": "人FcγRIIA与IgG-Fc结合",
+      "kind": "representative-protein-loop",
+      "entry": "细胞图谱 → 细胞膜 → 播放；膜表面或膜壁剖面",
+      "stages": [
+        {
+          "id": "membrane.fcgr-binding.0",
+          "title": "IgG接近"
+        },
+        {
+          "id": "membrane.fcgr-binding.1",
+          "title": "Fc与受体胞外D2区域结合"
+        },
+        {
+          "id": "membrane.fcgr-binding.2",
+          "title": "IgG离开"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/plasma-membrane-detail.js",
+          "src/organelle-models.js"
+        ],
+        "symbol": "buildPlasmaMembraneDetail.applyPhase; ctx.onUpdate",
+        "references": [
+          "https://www.rcsb.org/structure/1FCG",
+          "https://www.uniprot.org/uniprotkb/P12318/entry"
+        ]
+      },
+      "teachingScope": "独立结合循环。两个胞外Ig域、单次跨膜、自身胞质ITAM的拓扑符号；没有多受体交联或完整吞噬活化，不是融合蛋白。"
+    },
+    {
+      "id": "membrane.p2x7-gating",
+      "title": "P2X7的ATP门控与阳离子通行",
+      "kind": "representative-protein-loop",
+      "entry": "细胞图谱 → 细胞膜 → 播放；膜壁剖面看中央孔",
+      "stages": [
+        {
+          "id": "membrane.p2x7-gating.0",
+          "title": "胞外ATP接近"
+        },
+        {
+          "id": "membrane.p2x7-gating.1",
+          "title": "三亚基间位点结合"
+        },
+        {
+          "id": "membrane.p2x7-gating.2",
+          "title": "中央孔门控开放"
+        },
+        {
+          "id": "membrane.p2x7-gating.3",
+          "title": "Na+向内和K+向外符号通行"
+        },
+        {
+          "id": "membrane.p2x7-gating.4",
+          "title": "ATP离开与门控关闭"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/plasma-membrane-detail.js",
+          "src/organelle-models.js"
+        ],
+        "symbol": "applyPhase; opening; ionPassage",
+        "references": [
+          "https://www.rcsb.org/structure/6U9V",
+          "https://www.rcsb.org/structure/6U9W",
+          "https://doi.org/10.1016/j.cell.2019.09.017"
+        ]
+      },
+      "teachingScope": "12秒独立循环，P2X7三聚体、每亚基两个跨膜区；开闭拓扑参考大鼠结构，程序化包络，未导入原子。离子方向选取典型电化学条件，非实测流量，不是病毒必经途径。"
+    },
+    {
+      "id": "surface-patch.lateral-motion",
+      "title": "微绒毛局部的自由样/暂受限侧向活动",
+      "kind": "stochastic-teaching-motion",
+      "entry": "细胞图谱 → 细胞膜 → 相关局部，或 更多局部观察 → 观察微绒毛与膜活动；进入后 更多局部观察 → 观察膜蛋白侧向活动；重播膜活动 / 单步 / 局部时间",
+      "stages": [
+        {
+          "id": "surface-patch.lateral-motion.0",
+          "title": "紫色符号在有限膜域自由样随机游走"
+        },
+        {
+          "id": "surface-patch.lateral-motion.1",
+          "title": "金色符号暂限于局部小域"
+        },
+        {
+          "id": "surface-patch.lateral-motion.2",
+          "title": "3.2秒教学释放后金色符号活动范围增大"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/cell-surface-patch.js",
+          "src/surface-activity-controls.js"
+        ],
+        "symbol": "oneStep; update; seek; RELEASE_STEP=192; FIXED_STEP=1/60",
+        "references": [
+          "https://pubmed.ncbi.nlm.nih.gov/8207056/",
+          "https://pmc.ncbi.nlm.nih.gov/articles/PMC5929997/"
+        ]
+      },
+      "teachingScope": "固定种子的通用跨膜位置符号，保持在同一膜曲面；未指定蛋白、实测扩散系数、限制分子或真实解离动力学。磷脂头尾带和微绒毛形态是静态构造。"
+    },
+    {
+      "id": "er-patch.lateral-motion",
+      "title": "折叠ER薄扁囊上的受限切向活动",
+      "kind": "bounded-placement-motion",
+      "entry": "细胞图谱 → 内质网 → 相关局部 → 柔软膜褶皱局部 → 播放",
+      "stages": [
+        {
+          "id": "er-patch.lateral-motion.0",
+          "title": "两通用跨膜符号保持朝向"
+        },
+        {
+          "id": "er-patch.lateral-motion.1",
+          "title": "在有限曲面范围以不同相位切向移动"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/membrane-patch.js",
+          "src/main.js"
+        ],
+        "symbol": "poseActors; update",
+        "references": [
+          "https://www.ncbi.nlm.nih.gov/books/NBK26841/"
+        ]
+      },
+      "teachingScope": "代表性连续折叠薄扁囊，不是完整ER网络或细胞表面微绒毛；移动不是命名蛋白的实测扩散轨迹。"
+    },
+    {
+      "id": "whole.cytoplasm-local-motion",
+      "title": "胞质受限局部慢动与短轨迹",
+      "kind": "ambient-nonmechanistic-motion",
+      "entry": "整胞视图 → 显示与隐藏 → 勾选“淡淡胞质微动 · 随播放显示” → 播放；整胞隐藏时停止",
+      "stages": [
+        {
+          "id": "whole.cytoplasm-local-motion.0",
+          "title": "淡色代表物作小幅局部运动"
+        },
+        {
+          "id": "whole.cytoplasm-local-motion.1",
+          "title": "短历史位置轨迹提示动态"
+        },
+        {
+          "id": "whole.cytoplasm-local-motion.2",
+          "title": "暂停或隐藏时不推进"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/cytoplasm-motion.js",
+          "src/main.js"
+        ],
+        "symbol": "createCytoplasmMotion.displacement; update; setEnabled",
+        "references": [
+          "https://pmc.ncbi.nlm.nih.gov/articles/PMC4183065/"
+        ]
+      },
+      "teachingScope": "上限0.20场景单位的受限位移，非全细胞涡流、流体求解或巨噬细胞速度测量；不赋予每个背景粒子特定分子身份。"
+    },
+    {
+      "id": "whole.microtubule-carriers",
+      "title": "整胞微管段上的马达附着小载体往返",
+      "kind": "bounded-carrier-motion",
+      "entry": "细胞图谱整胞 / 日常协作整胞位置 → 三类细胞骨架 · 按需显示 → 显示骨架网络 / 靠近微管 → 播放；摄取外物场景与病毒HA局部不显示网络",
+      "stages": [
+        {
+          "id": "whole.microtubule-carriers.0",
+          "title": "封闭小载体带未指定马达符号附着微管外侧"
+        },
+        {
+          "id": "whole.microtubule-carriers.1",
+          "title": "在验证过的微管0.74–0.92曲线段内有限余弦往返"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/cytoskeleton-network.js",
+          "src/exploration-controls.js",
+          "src/main.js"
+        ],
+        "symbol": "carrierPoint; applyActors; update",
+        "references": [
+          "https://pmc.ncbi.nlm.nih.gov/articles/PMC2139871/",
+          "https://pmc.ncbi.nlm.nih.gov/articles/PMC9866147/"
+        ]
+      },
+      "teachingScope": "少量代表性载体，非实测轨迹；未表现双头步态、全部马达动力学、轨道转换或细胞器膜交付。微管/F-actin/中间丝本体保持静态。"
+    },
+    {
+      "id": "whole.phagosome-progress",
+      "title": "整胞已封闭吞噬体的运输、共腔与处理",
+      "kind": "macro-story-progress",
+      "entry": "生命过程 → 摄取外物 → 大颗粒吞噬或非感染性抗原清除 → 返回整胞 → 播放/演示进度",
+      "stages": [
+        {
+          "id": "whole.phagosome-progress.0",
+          "title": "已封闭吞噬体向内运输",
+          "stopPercent": 64,
+          "wholeParameter": 0.412631579,
+          "phase": "closed_phagosome_transport",
+          "objects": [
+            "phago.position",
+            "PhagosomeParticleBody",
+            "PhagosomeParticulateFragments"
+          ],
+          "action": "膜包围的整个吞噬体沿 entry→phagoCenter 路径向内运输，货物保持腔内。",
+          "classroomTalk": "货物在腔里，搬动的是整间膜包围的房间，它没有钻进胞质。",
+          "question": "货物外面是否仍有膜？位置改变是否等于已经降解？"
+        },
+        {
+          "id": "whole.phagosome-progress.1",
+          "title": "降解供体靠近并对接",
+          "stopPercent": 71,
+          "wholeParameter": 0.526842105,
+          "phase": "lysosome_docking",
+          "objects": [
+            "dockingLysosome",
+            "fusionWall"
+          ],
+          "action": "选定溶酶体供体向吞噬体接近，仍呈分离边界；尚未形成连续共腔。",
+          "classroomTalk": "接近不等于共腔。先找两间房各自的边界，再看接触处。",
+          "question": "对接时能否直接把所有内容物画到另一边？"
+        },
+        {
+          "id": "whole.phagosome-progress.2",
+          "title": "形成连续膜包围的共同区室",
+          "stopPercent": 79,
+          "wholeParameter": 0.657368421,
+          "phase": "closed_fusion_compartment",
+          "objects": [
+            "fusionWall",
+            "dockingContents"
+          ],
+          "action": "q≥0.63 改为连续共腔边界；外部仍为胞质，共腔不是向胞质打开。",
+          "classroomTalk": "现在观察膜拓扑改变：两边共享封闭处理空间，外侧仍是胞质。",
+          "question": "共腔以后是向胞质敞开，还是仍被连续膜围住？"
+        },
+        {
+          "id": "whole.phagosome-progress.3",
+          "title": "酶性内容转移并开始降解概括",
+          "stopPercent": 90,
+          "wholeParameter": 0.836842105,
+          "phase": "enzymatic_digestion",
+          "objects": [
+            "HydrolasesEnteringClosedPhagolysosome",
+            "PhagosomeParticleBody",
+            "PhagosomeParticulateFragments",
+            "LumenCargoGranules"
+          ],
+          "action": "酶性内容实例沿供体侧→货物侧移动；q>0.72 后货物、碎片与原有腔内颗粒按 residual 逐渐缩小。",
+          "classroomTalk": "这些小形状表示处理所需的酶性内容，不是新生病毒。整体变小概括处理结果。",
+          "question": "哪些代表处理者，哪一块代表被处理货物？"
+        },
+        {
+          "id": "whole.phagosome-progress.4",
+          "title": "封闭区室内保留较小残余",
+          "stopPercent": 98,
+          "wholeParameter": 0.967368421,
+          "phase": "enzymatic_digestion",
+          "objects": [
+            "PhagosomeParticleBody",
+            "PhagosomeParticulateFragments",
+            "LumenCargoGranules",
+            "fusionWall"
+          ],
+          "action": "残余尺度接近终值，膜围区室继续保留货物残余；没有动画宣告全部清除。",
+          "classroomTalk": "降解不是按一下就彻底消失。这里仍有残余，能否继续清除要看真实材料与细胞状态。",
+          "question": "画面还剩哪些内容？能否据此说货物已被完全清除？"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/uptake-controls.js",
+          "src/whole-atlas.js",
+          "src/main.js"
+        ],
+        "symbol": "getWholeProgress; setProgress: transport, docking, joined (q≥0.63), digestion (q>0.72), updateFusion, enzymeInstances",
+        "references": []
+      },
+      "teachingScope": "当前入口从整胞原进度0.38映射起，未播放最早开放杯0..0.18；局部吞噬膜杯另见uptake。整胞明确演出供体交流及酶性内容转移，局部课则省略或简化供体融合、酶递送和酸化装置；两处不能混说。连续膜形态与内容转移为粗化教学，没有逐叶脂双层融合、全套SNARE/系留因子或酶的原子催化。整胞与局部是不同尺度表达，不是同一原位事件的等比例录像；可溶MR配体没有该大颗粒整胞驱动。",
+      "clock": {
+        "input": "摄取外物界面演示进度 p，范围 0..1",
+        "wholeParameter": "q = 0.38 + 0.62 * clamp((p - 0.62) / 0.38, 0, 1)",
+        "note": "下列 stopPercent 是界面停点，不是机制发生的精确实验时刻；整胞直接从已封闭状态 q=0.38 起。"
+      }
+    }
+  ],
+  "staticObservations": [
+    {
+      "id": "static.nuclear-pore",
+      "title": "核孔复合体",
+      "entry": "细胞图谱 → 核孔复合体",
+      "features": [
+        "八重总体支架",
+        "胞质纤维、核篮与贯通轮廓"
+      ],
+      "source": {
+        "files": [
+          "src/organelle-models.js"
+        ],
+        "symbol": "poreComplex; createOrganelle(pore)",
+        "references": []
+      },
+      "teachingScope": "只有结构、剖切和相机观察；IRF3/mRNA/STAT运输在virus.response对应子步骤，不是本构造自带功能循环。"
+    },
+    {
+      "id": "static.nuclear-er",
+      "title": "核膜—ER连续性与粗/光面ER",
+      "entry": "细胞图谱 → 细胞核/内质网 → 连接结构/光面内质网构造",
+      "features": [
+        "双核膜与核孔",
+        "外核膜与ER连续连接",
+        "粗面ER附着核糖体",
+        "光面管状ER网络",
+        "真实薄腔的观察相机"
+      ],
+      "source": {
+        "files": [
+          "src/nuclear-er-continuum.js",
+          "src/er-smooth-network.js",
+          "src/organelle-models.js"
+        ],
+        "symbol": "buildNuclearER; attachSERToNuclearER; createNuclearERGeometry",
+        "references": []
+      },
+      "teachingScope": "静态结构与连通拓扑。没有整个ER周期性流动或全网蛋白转位；合成转位看cooperation.synthesis或virus.response。"
+    },
+    {
+      "id": "static.golgi",
+      "title": "高尔基体与反面网络",
+      "entry": "细胞图谱 → 高尔基体 → 构造焦点",
+      "features": [
+        "cis/trans身份",
+        "层叠扁囊及腔",
+        "连续TGN和连接颈"
+      ],
+      "source": {
+        "files": [
+          "src/organelle-models.js",
+          "src/secretory-golgi-network.js"
+        ],
+        "symbol": "buildGolgi; createTransGolgiNetwork",
+        "references": []
+      },
+      "teachingScope": "构造本体不播放加工/载体出芽机制；相关动态见cooperation.synthesis和virus.response。"
+    },
+    {
+      "id": "static.mitochondrion",
+      "title": "线粒体双膜与嵴",
+      "entry": "细胞图谱 → 线粒体 → 构造焦点",
+      "features": [
+        "外膜",
+        "边界内膜与相连嵴",
+        "嵴腔、膜间隙与基质"
+      ],
+      "source": {
+        "files": [
+          "src/organelle-models.js",
+          "src/atlas-geometry.js"
+        ],
+        "symbol": "buildMito; createContinuousMitoCore",
+        "references": []
+      },
+      "teachingScope": "图谱构造静态；ATP合酶功能符号在cooperation.transport第1步，MAVS在virus.response外膜胞质侧。"
+    },
+    {
+      "id": "static.cytoskeleton-detail",
+      "title": "骨架局部：13原纤维微管、马达与载体构造",
+      "entry": "当前普通界面入口未开放；点击细胞骨架在整胞状态转到骨架网络焦点",
+      "features": [
+        "空心微管",
+        "马达头/柄与载体",
+        "肌动蛋白螺旋形态"
+      ],
+      "source": {
+        "files": [
+          "src/organelle-models.js"
+        ],
+        "symbol": "buildCytoskeleton",
+        "references": []
+      },
+      "teachingScope": "静态构造，没有在本局部实现双头换步；功能步态见cooperation.transport。 当前普通入口不开放，不能列为学生可点击课程。",
+      "reachableFromNormalUI": false,
+      "implementationStatus": "retained-source-normal-entry-not-open",
+      "routeEvidence": {
+        "files": [
+          "src/main.js",
+          "src/exhibition-layout.js"
+        ],
+        "symbol": "viewModel: whole cytoskeleton → focusSkeleton('network') and return; relatedByParent.cytoskeleton retains tubulin-structure"
+      }
+    },
+    {
+      "id": "static.vesicles-and-peroxisome",
+      "title": "内体、吞噬体、溶酶体、过氧化物酶体构造",
+      "entry": "细胞图谱 → 对应区室 → 剖切与内容标签",
+      "features": [
+        "各自限制膜与腔内代表性内容",
+        "过氧化物酶体酶结构示例",
+        "吞噬体检查视图复用整胞形态"
+      ],
+      "source": {
+        "files": [
+          "src/compartment-ultrastructure.js",
+          "src/compartment-models.js",
+          "src/phagosome-inspection.js"
+        ],
+        "symbol": "buildUltrastructureSortingEndosome; buildUltrastructureLysosome; buildPeroxisome; createInspection",
+        "references": []
+      },
+      "teachingScope": "构造/内容域展示，不凭电子致密程度推断酶活；未模拟过氧化氢生成分解或所有腔内酶的催化循环。吞噬体检查只呈现当前整胞状态，不独立重播吞噬过程。"
+    },
+    {
+      "id": "static.tubulin-1jff",
+      "title": "α/β微管蛋白 · PDB 1JFF",
+      "entry": "当前普通界面入口未开放；点击细胞骨架在整胞状态转到骨架网络焦点",
+      "features": [
+        "A/B链Cα坐标派生轨迹",
+        "保留坐标缺失/长距离断开"
+      ],
+      "source": {
+        "files": [
+          "src/molecular-models.js",
+          "src/molecular-structure-data.js"
+        ],
+        "symbol": "createMolecularModel(tubulin-structure)",
+        "references": [
+          "https://www.rcsb.org/structure/1JFF"
+        ]
+      },
+      "teachingScope": "牛同源样本的静态坐标粗化骨架，不是完整天然微管格；无聚合、解聚、马达步态或测得功能运动。 当前普通入口不开放，不能列为学生可点击课程。",
+      "reachableFromNormalUI": false,
+      "implementationStatus": "retained-source-normal-entry-not-open",
+      "routeEvidence": {
+        "files": [
+          "src/main.js",
+          "src/exhibition-layout.js"
+        ],
+        "symbol": "viewModel: whole cytoskeleton → focusSkeleton('network') and return; relatedByParent.cytoskeleton retains tubulin-structure"
+      }
+    },
+    {
+      "id": "static.ribosome-4ug0",
+      "title": "人80S核糖体 · PDB 4UG0",
+      "entry": "细胞图谱 → 核糖体 → 相关局部 → 人80S · 4UG0",
+      "features": [
+        "蛋白Cα与RNA P坐标派生轨迹",
+        "按链和亚基区分",
+        "未补缺失环"
+      ],
+      "source": {
+        "files": [
+          "src/molecular-models.js",
+          "src/molecular-structure-data.js"
+        ],
+        "symbol": "createMolecularModel(ribosome-structure)",
+        "references": [
+          "https://www.rcsb.org/structure/4UG0"
+        ]
+      },
+      "teachingScope": "静态公开坐标展示，旋转/剖切属于观察操作；未添加mRNA解码、tRNA动态循环或翻译功能模拟。图谱通用核糖体本体同样是结构示意。",
+      "reachableFromNormalUI": true
+    }
+  ],
+  "coverageNotes": [
+    "病毒宿主应答细节由专章展开，此inventory保留全部19子步骤映射。",
+    "fusion.ha-fusion与virus.ha-entry复用同一HA基础模型；后者增加课堂标签和周边膜弧度，不重复计作两个独立生物学机制。",
+    "核孔、ER、Golgi、线粒体结构细节大多为静态；机制动态入口以各记录为准。",
+    "未发现上述入口之外的独立可播放生物学计时器；ctx.moving在当前通用细胞器工厂中没有添加项目，不能把空通用更新循环当成已实现动画。",
+    "微绒毛与ER局部通过其父细胞结构的相关局部/更多局部观察进入；4UG0普通入口可达，旧骨架静态局部与1JFF的普通入口当前未开放。",
+    "whole.endosomal-sorting-markers 移入 retainedNotConnected；它不属于当前可播放过程计数。"
+  ],
+  "retainedNotConnected": [
+    {
+      "id": "whole.endosomal-sorting-markers",
+      "title": "部分内体体部—管部的腔内标记往返",
+      "kind": "representative-domain-motion",
+      "entry": "当前整胞内体构建路径未接入；无现行普通播放入口",
+      "stages": [
+        {
+          "id": "whole.endosomal-sorting-markers.0",
+          "title": "早期/回收内体的两个腔内标记沿选定曲线有限往返"
+        }
+      ],
+      "source": {
+        "files": [
+          "src/whole-vesicle-domains.js",
+          "src/whole-atlas.js"
+        ],
+        "symbol": "createWholeVesicleDomain; EndosomalLumenSortingCargo; update",
+        "references": []
+      },
+      "teachingScope": "whole-vesicle-domains 的 endosome variant0/2 保留腔内标记往返实现，但当前 whole-atlas 以 component(\"endosome\") 创建内体，没有调用该分支。属于保留源码，不算当前已实现的可播放教学。实际分流课程见 cooperation.recycling 与 uptake.mannose-receptor-endocytosis。",
+      "reachableFromNormalUI": false,
+      "implementationStatus": "retained-source-not-connected"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ class AnatomyAOPass extends SSAOPass {
     this.scene.traverse((o) => {
       if (!o.isMesh || !o.visible) return;
       const list = Array.isArray(o.material) ? o.material : [o.material];
-      if (list.every((m) => (m.transmission ?? 0) > 0.15 || m.transparent && m.opacity < 0.6)) {
+      if (list.every((m) => m.userData?.excludeFromAO || (m.transmission ?? 0) > 0.15 || m.transparent && m.opacity < 0.6)) {
         o.visible = false;
         this._visibilityCache.push(o);
       }

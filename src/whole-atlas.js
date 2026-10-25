@@ -1,7 +1,9 @@
-import { confineERWorldPoint } from "./nuclear-er-continuum.js";
+import { confineERWorldPoint, shapeERWorldPoint, erWorldFrame } from "./nuclear-er-continuum.js";
 import * as THREE from "three";
 import { createWholeMembraneStatic } from "./whole-membrane-static.js";
 import { createWholeVesicleDomain } from "./whole-vesicle-domains.js";
+import { applyWholeOrganelleFinish } from "./whole-organelle-finish.js";
+import { createPhagosomeInspection } from "./phagosome-inspection.js";
 import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 const TAU = Math.PI * 2;
 const LABELS = { nucleus: "细胞核", er: "内质网", golgi: "高尔基体", mitochondria: "线粒体", lysosome: "溶酶体", endosome: "内体", membrane: "细胞膜", cytoskeleton: "细胞骨架", pore: "核孔", phagosome: "吞噬体", peroxisome: "过氧化物酶体", ribosome: "核糖体" };
@@ -140,7 +142,7 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     return m;
   }
   function physical(color, options = {}) {
-    const m = new THREE.MeshPhysicalMaterial({ color, roughness: 0.24, metalness: 0.01, side: THREE.DoubleSide, bumpMap: tex, bumpScale: 9e-3, ...options });
+    const m = new THREE.MeshPhysicalMaterial({ color, roughness: 0.56, metalness: 0, clearcoat: 0.025, clearcoatRoughness: 0.65, side: THREE.DoubleSide, bumpMap: tex, bumpScale: 9e-3, ...options });
     if (m.transparent && m.opacity < 1) {
       m.onBeforeCompile = (shader) => {
         shader.fragmentShader = shader.fragmentShader.replace("#include <alphatest_fragment>", "float membraneFresnel = pow(1.0 - abs(dot(normalize(vViewPosition), normalize(vNormal))), 2.6); diffuseColor.a *= mix(0.24, 1.0, membraneFresnel);\n#include <alphatest_fragment>");
@@ -185,12 +187,12 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
   tag(shell, "membrane", pickables);
   plasmaMembrane.edge.userData.organelleId = "membrane";
   location("membrane", [-5.75, -2.7, 0.6], 1.2);
-  const nc = new THREE.Vector3(-2.25, 1.15, -0.05), nuclearPlaced = component("nucleus", nc.toArray(), 1, [0, 0, 0], 0.48, true);
+  const nc = new THREE.Vector3(-2.25, 1.15, -0.05), nuclearPlaced = component("nucleus", nc.toArray(), 1, [0, 0, 0], 0.60, true);
   let preferredPore = new THREE.Vector3(-3.05, 2.9, 0.6);
   if (nuclearPlaced) {
     nuclearPlaced.holder.scale.set(1.55, 1.83, 1.36);
     nuclearPlaced.holder.updateWorldMatrix(true, true);
-    nuclearPlaced.component.setSection(0.48);
+    nuclearPlaced.component.setSection(0.60);
     const npc = nuclearPlaced.component.group.getObjectByName("ThirtyTwoEightFoldNPCAssemblies");
     if (npc) {
       npc.userData.organelleId = "pore";
@@ -231,13 +233,23 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
         const list = Array.isArray(object.material) ? object.material : [object.material];
         for (let index = 0; index < list.length; index++) {
           const material = list[index];
-          material.color.set(index === 0 ? "#73568f" : index === 1 ? "#7198a7" : "#96b6c1");
-          material.roughness = index === 0 ? 0.46 : index === 1 ? 0.45 : 0.48;
+          material.color.set(["#8565a2", "#80aebb", "#aac6cc", "#b3c4af"][index] ?? "#8eafb6");
+          material.roughness = index === 0 ? 0.59 : index === 1 ? 0.55 : 0.58;
+          if(material.isMeshPhysicalMaterial){material.clearcoat=.035;material.clearcoatRoughness=.58;material.specularIntensity=.48;material.transmission=0;}
           // Every material here belongs to the continuous NE/ER wall.
           // Preserve chromatin/NPC protein maps on their separate meshes.
           material.map = material.bumpMap = material.roughnessMap = null;
           material.bumpScale = 0;
           material.userData.continuousSurfaceV1 = true;
+          applyWholeOrganelleFinish(material, {
+            contrast: index === 0 ? 0.23 : 0.14,
+            relief: index === 0 ? 0.006 : 0.0035,
+            roughnessVariation: index === 0 ? 0.12 : 0.07,
+            scale: index === 0 ? 5.8 : 4.3,
+            seed: index * 2.71,
+            softScatter: index === 0 ? .025 : .045,
+            toneShift: index === 0 ? [.11, -.05, .12] : [-.04, .10, .14],
+          });
           material.needsUpdate = true;
         }
       }
@@ -261,24 +273,25 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
   const erGroup = new THREE.Group();
   erGroup.name = "ConnectedERBoundRibosomes";
   group.add(erGroup);
-  const erDepth = (a) => 0.82 + 0.18 * Math.sin(a * 3 + 0.5) + 0.1 * Math.sin(a * 5), erTilt = (a) => 0.6 + 0.18 * Math.sin(a * 3 + 0.7) + 0.1 * Math.sin(a * 7);
-  const erAngle = (j, t) => THREE.MathUtils.lerp(-2.95 + j * 0.057 + 0.095 * Math.sin(j * 1.3), 1.6 - j * 0.075 + 0.11 * Math.sin(j * 2.1), t);
-  function erCenter(j, t) {
-    const a = erAngle(j, t), rx = 2.31 + j * 0.2, ry = 2.48 + j * 0.19, warp = 0.16 * Math.sin(a * 5 + j * 0.075) + 0.065 * Math.sin(a * 9 + j * 0.075);
-    return new THREE.Vector3(nc.x + (rx + warp) * Math.cos(a), nc.y + (ry + warp) * Math.sin(a), -0.6 + 0.075 * j + 0.16 * Math.sin(a * 2) + 0.1 * Math.sin(a * 5) + 0.025 * Math.sin(j * 0.8));
-  }
-  const riboMat = standard("#ad80ad", 0.57, { bumpScale: 5e-3 }), ribos = [];
+  const riboMat = standard("#a485a5", 0.57, { bumpScale: 5e-3 }), ribos = [];
   for (let i = 0; i < 780; i++) {
-    const j = Math.floor(rand() * 11), t = 0.025 + rand() * 0.95, a = erAngle(j, t), c = erCenter(j, t);
-    c.z += erDepth(a) + 0.025 + rand() * 0.025;
-    c.x += Math.cos(a) * (erTilt(a) * Math.min(1, 0.3 + j * 0.33) * erDepth(a) + 0.018 + (rand() - 0.5) * 0.04);
-    c.y += Math.sin(a) * (erTilt(a) * Math.min(1, 0.3 + j * 0.33) * erDepth(a) + 0.018 + (rand() - 0.5) * 0.04);
-    c.copy(confineERWorldPoint(c));
+    const j = Math.floor(rand() * 11), t = 0.025 + rand() * 0.95, frame = erWorldFrame(j, t), a = frame.angle, c = frame.center;
+    c.z += frame.depth + 0.025 + rand() * 0.025;
+    c.x += Math.cos(a) * (frame.tilt * frame.depth + 0.018 + (rand() - 0.5) * 0.04);
+    c.y += Math.sin(a) * (frame.tilt * frame.depth + 0.018 + (rand() - 0.5) * 0.04);
+    c.copy(confineERWorldPoint(shapeERWorldPoint(c)));
     ribos.push({ p: c.toArray(), r: 0.03 + rand() * 0.028, s: [0.045 + rand() * 0.027, 0.035 + rand() * 0.02, 0.045 + rand() * 0.02], rot: [rand() * 3, rand() * 3, rand() * 3] });
   }
-  instance("ribosome", smoothShared(deformedBall(1, 2)), riboMat, ribos, erGroup);
-  location("er", confineERWorldPoint(new THREE.Vector3(-0.42, -0.17, 0.7)).toArray(), 1.5);
-  location("ribosome", confineERWorldPoint(new THREE.Vector3(-2.67, -1.48, 0.8)).toArray(), 0.6);
+  // Distinct large and small subunit envelopes read as attached ribosomes,
+  // rather than a regular row of equal pink beads. Placement stays unchanged.
+  for (let i = 0; i < ribos.length; i++) {
+    const size = 0.78 + 0.12 * (0.5 + 0.5 * Math.sin(i * 2.399));
+    ribos[i].s = ribos[i].s.map(axis => axis * size);
+  }
+  const boundRibosomes = instance("ribosome", proteinCluster(1), riboMat, ribos, erGroup);
+  boundRibosomes.name = "WholeERRibosomalSubunitEnvelopes";
+  location("er", confineERWorldPoint(shapeERWorldPoint(new THREE.Vector3(-0.42, -0.17, 0.7))).toArray(), 1.5);
+  location("ribosome", confineERWorldPoint(shapeERWorldPoint(new THREE.Vector3(-2.67, -1.48, 0.8))).toArray(), 0.6);
   // Preserve the shared random sequence consumed by the former 42 Golgi
   // carrier placements (five draws each). Other organelles stay byte-identical.
   for (let i = 0; i < 42 * 5; i++) rand();
@@ -295,6 +308,10 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
       // the new TGN; carrier visibility remains independent of Golgi cisternae.
       object.userData.compartmentBoundary = object.userData.shell === true;
       if (object.userData.secretoryDomain === "carriers") object.userData.componentKey = "transport-vesicles";
+      if (object.userData.shell) for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        material.color?.lerp(new THREE.Color("#dfa6a0"), .22);
+        applyWholeOrganelleFinish(material, { contrast: 0.16, relief: 0.0036, scale: 5.6, seed: 4.1, softScatter: .045, toneShift: [.15,.025,-.07] });
+      }
     });
     golgiGroup.updateWorldMatrix(true, true);
     const box = new THREE.Box3().setFromObject(golgiGroup), vertex = new THREE.Vector3();
@@ -334,18 +351,29 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     ownedComponents.push(c);
     return { component: c, holder };
   }
-  const mitoSites = [{ p: [1.5, 3.35, 0.8], scale: 0.96, rot: [0.17, 0.4, -0.48] }, { p: [1.48, -0.38, 1.52], scale: 0.84, rot: [0.13, -0.42, -0.57] }, { p: [-3.5, -3.35, 0.82], scale: 0.83, rot: [0.2, 0.36, -0.42] }, { p: [4.27, -2.45, 0.12], scale: 0.57, rot: [0.1, 0.28, 0.55] }, { p: [3.1, 3.15, -1.8], scale: 0.54, rot: [0.12, 0.1, -0.55] }];
+  const mitoSites = [{ p: [1.5, 3.35, 2.32], scale: 0.96, rot: [0.17, 0.4, -0.48] }, { p: [1.48, -0.38, 1.52], scale: 0.84, rot: [0.13, -0.42, -0.57] }, { p: [-3.15, -3.15, 1.8], scale: 0.83, rot: [0.2, 0.36, -0.42] }, { p: [4.27, -2.45, 0.12], scale: 0.57, rot: [0.1, 0.28, 0.55] }, { p: [3.1, 3.15, -1.8], scale: 0.54, rot: [0.12, 0.1, -0.55] }];
   for (const site of mitoSites) {
     const placed = component("mitochondria", site.p, site.scale, site.rot, 0.78);
-    if (placed) mitochondria.push(placed);
+    if (placed) {
+      placed.component.group.traverse(object => {
+        if (!object.isMesh || !/Mitochondrial|ClosedOuter/.test(object.name)) return;
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          applyWholeOrganelleFinish(material, { contrast: 0.15, relief: 0.0032, scale: 7.1, seed: 1.8, softScatter: .035, toneShift: [.12,.02,-.06] });
+        }
+      });
+      mitochondria.push(placed);
+    }
   }
   location("mitochondria", mitoSites[0].p, 1.6);
-  const lysMat = physical("#b9a0c6", { roughness: 0.12, transparent: false, opacity: 1, transmission: 0.77, thickness: 0.055, ior: 1.35, bumpScale: 3e-3, clearcoat: 1, attenuationColor: new THREE.Color("#cfb6d5"), attenuationDistance: 0.85, depthWrite: true }), lysCargoMat = standard("#8d6c9d", 0.57, { bumpScale: 0.025 }), endoMat = physical("#e9c17f", { roughness: 0.12, transparent: false, opacity: 1, transmission: 0.78, thickness: 0.05, ior: 1.35, bumpScale: 3e-3, clearcoat: 1, depthWrite: true }), peroxiMat = physical("#a4c6b9", { roughness: 0.13, transparent: false, opacity: 1, transmission: 0.76, thickness: 0.055, ior: 1.35, bumpScale: 3e-3, clearcoat: 1, depthWrite: true });
+  const lysMat = physical("#b9a0c6", { roughness: 0.55, transparent: false, opacity: 1, transmission: 0.06, thickness: 0.055, ior: 1.34, bumpScale: 3e-3, clearcoat: 0.035, clearcoatRoughness:0.58, specularIntensity:0.46, clippingPlanes:[shellPlane], attenuationColor: new THREE.Color("#cfb6d5"), attenuationDistance: 0.85, depthWrite: true }), lysCargoMat = standard("#8d6c9d", 0.57, { bumpScale: 0.025 }), endoMat = physical("#e9c17f", { roughness: 0.12, transparent: false, opacity: 1, transmission: 0.78, thickness: 0.05, ior: 1.35, bumpScale: 3e-3, clearcoat: 1, depthWrite: true }), peroxiMat = physical("#a4c6b9", { roughness: 0.13, transparent: false, opacity: 1, transmission: 0.76, thickness: 0.055, ior: 1.35, bumpScale: 3e-3, clearcoat: 1, depthWrite: true });
   for (const material of [lysMat, endoMat]) {
     material.bumpMap = null;
     material.bumpScale = 0;
     material.userData.continuousSurfaceV1 = true;
   }
+  // The whole-cell section exposes cargo through removed membrane, rather than
+  // high glass-like transmission. Closed CPU boundary geometry stays intact.
+  applyWholeOrganelleFinish(lysMat,{contrast:.12,relief:.006,roughnessVariation:.10,scale:9.2,maxSlope:.22,seed:3.4});
   const vesicleGeo = new THREE.SphereGeometry(1, 36, 26), cargoGeo = deformedBall(1, 2), phagocyticShardGeo = lamellarShard();
   function filledVesicle(id, position, radius, membraneMat, cargoMat, count = 20, variant = 0) {
     const vesicle = new THREE.Group();
@@ -376,7 +404,7 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     return vesicle;
   }
   const lysosomes = [];
-  const lysSites = [[3.15, 2.18, 0.88, 0.61], [2.85, -2.7, 1.3, 0.55], [-0.95, -4.32, 0.62, 0.52], [4.4, 1.7, -1.8, 0.45], [-4.78, 0.35, -0.3, 0.42], [0.95, 1.44, 0.2, 0.35]];
+  const lysSites = [[4.65, 2.28, 1.15, 0.61], [2.85, -2.7, 1.3, 0.55], [-0.95, -4.32, 0.62, 0.52], [4.4, 1.7, -1.8, 0.45], [-4.78, 0.35, -0.3, 0.42], [0.95, 1.44, 0.2, 0.35]];
   for (let site = 0; site < lysSites.length; site++) {
     const [x, y, z, r] = lysSites[site];
     // Retain docking [0] and fallback [1]; consume the old downstream random
@@ -386,23 +414,37 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     lysosomes.push({ group: vesicle, base: new THREE.Vector3(x, y, z), radius: r });
   }
   location("lysosome", lysSites[0].slice(0, 3), 0.7);
-  const endosomeSites = [[3.92, 3.1, 0.24, 0.42], [2.55, 1.08, 0.83, 0.35], [0.36, 4.6, -0.12, 0.34], [2.85, -4.37, 0.38, 0.35], [-4.8, -2.5, 0.2, 0.28], [4.45, -1.25, -1.8, 0.32], [0.04, -4.9, 0.2, 0.31]];
+  const endosomeSites = [[3.92, 3.1, 0.24, 0.42], [2.55, 1.08, 1.5, 0.35], [0.36, 4.6, 1.5, 0.34], [2.85, -4.37, 0.38, 0.35], [-4.8, -2.5, 0.2, 0.28], [4.45, -1.25, -1.8, 0.32], [0.04, -4.9, 0.2, 0.31]];
+  const endosomeComponents = [], peroxisomeComponents = [];
   for (let site = 0; site < endosomeSites.length; site++) {
     const [x, y, z, r] = endosomeSites[site];
-    if (site >= 3) { for (let i = 0; i < 12 * 4; i++) rand(); continue; }
-    filledVesicle("endosome", [x, y, z], r, endoMat, standard("#d9bc78", 0.53), 12, site);
+    // Keep downstream cargo/fusion seeds stable while replacing the old symbol.
+    for (let i = 0; i < 12 * 4; i++) rand();
+    if (site >= 3) continue;
+    const placed = component("endosome", [x, y, z], r / 1.08, [0, 0, site * 1.3 - .35], .62, false);
+    if (placed) endosomeComponents.push(placed);
   }
-  location("endosome", [2.55, 1.08, 0.83], 0.5);
-  for (const [x, y, z, r] of [[-0.44, -4.22, 1.15, 0.3], [4.05, -1.49, 0.8, 0.3], [-5, 1.5, -0.1, 0.29]]) filledVesicle("peroxisome", [x, y, z], r, peroxiMat, standard("#8ba395", 0.5), 23);
+  location("endosome", endosomeSites[1].slice(0, 3), 0.5);
+  for (const [x, y, z, r] of [[-0.44, -4.22, 1.15, 0.3], [4.05, -1.49, 0.8, 0.3], [-5, 1.5, -0.1, 0.29]]) {
+    for (let i = 0; i < 23 * 4; i++) rand();
+    const placed = component("peroxisome", [x, y, z], r / 1.08, [.1, .2, -.35], .67, false);
+    if (placed) peroxisomeComponents.push(placed);
+  }
   location("peroxisome", [-0.44, -4.22, 1.15], 0.4);
-  const phagoCenter = new THREE.Vector3(4.03, 0.02, 1.3), phagoMat = physical("#f4e3bd", { roughness: 0.05, transparent: false, opacity: 1, transmission: 0.96, thickness: 0.035, ior: 1.2, bumpScale: 4e-3, clearcoat: 1, attenuationColor: new THREE.Color("#fff8ec"), attenuationDistance: 5, depthWrite: true }), phago = filledVesicle("phagosome", phagoCenter.toArray(), 1, phagoMat, standard("#ffffff", 0.82, { bumpScale: 0.025 }), 8);
-  const cargo = add(new THREE.Mesh(roughFragmentMass(0.59, 24), standard("#c5c1b8", 0.86, { bumpMap: surfaceTextures.cargo ?? tex, bumpScale: 0.05 })), "phagosome", phago);
+  const phagosomePlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+  const phagoCenter = new THREE.Vector3(4.03, 0.02, 1.3), phagoMat = physical("#cfb887", { roughness: 0.52, transparent: false, opacity: 1, transmission: 0.08, thickness: 0.035, ior: 1.34, bumpScale: 4e-3, clearcoat: 0.04, clearcoatRoughness:0.56, specularIntensity:0.48, clippingPlanes:[phagosomePlane], attenuationColor: new THREE.Color("#fff5dc"), attenuationDistance: 5, depthWrite: true }), phago = filledVesicle("phagosome", phagoCenter.toArray(), 1, phagoMat, standard("#ffffff", 0.82, { bumpScale: 0.025 }), 8);
+  applyWholeOrganelleFinish(phagoMat,{contrast:.14,relief:.006,roughnessVariation:.1,scale:9.4,maxSlope:.22,seed:8.1});
+  phagoMat.transmission=0;phagoMat.clearcoat=0;phagoMat.roughness=.7;
+  const cargo = add(new THREE.Mesh(roughFragmentMass(0.59, 24), standard("#b6aa94", 0.86, { bumpMap: surfaceTextures.cargo ?? tex, bumpScale: 0.012 })), "phagosome", phago);
   cargo.scale.set(1.04, 1.03, 0.85);
   cargo.name = "PhagosomeParticleBody";
   const fragments = [];
   for (let i = 0; i < 185; i++) {
     const a = rand() * TAU, z = rand() * 2 - 1, r = 0.46 + 0.16 * rand(), sn = Math.sqrt(1 - z * z);
-    fragments.push({ p: [Math.cos(a) * r * sn, Math.sin(a) * r * sn, z * r * 0.85], r: 0.035 + rand() * 0.075, rot: [i * 2.399, i * 0.713, i * 1.721], c: i % 7 === 0 ? "#e1ded5" : i % 3 ? "#c7c2b8" : "#a6a197" });
+    const fragment={ p: [Math.cos(a) * r * sn, Math.sin(a) * r * sn, z * r * 0.85], r: 0.035 + rand() * 0.075, rot: [i * 2.399, i * 0.713, i * 1.721], c: i % 7 === 0 ? "#d1c8b6" : i % 3 ? "#b8ad99" : "#a39885" };
+    // Retain the random stream used by downstream placements, but show only
+    // sparse damage regions so the coherent engulfed cargo remains dominant.
+    if(i%7===0)fragments.push(fragment);
   }
   const phagoFragments = instance("phagosome", phagocyticShardGeo, standard("#ffffff", 0.86, { bumpMap: surfaceTextures.cargo ?? tex, bumpScale: 0.018 }), fragments, phago);
   phagoFragments.name = "PhagosomeParticulateFragments";
@@ -444,11 +486,12 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
   }
   const fusionGeometry = geometry(fusionPositions, [...separateA, ...separateB], fusionUV);
   const fusionLysMat = lysMat.clone();
+  fusionLysMat.clippingPlanes = [phagosomePlane];
   materials.push(fusionLysMat);
   const fusionWall = add(new THREE.Mesh(fusionGeometry, [phagoMat, fusionLysMat]), "phagosome", phago);
   fusionWall.name = "ClosedContinuousPhagolysosomeFusionMembrane";
   fusionWall.userData.organelleByMaterial = { 0: "phagosome", 1: "lysosome" };
-  const fusionAxis = new THREE.Vector3(-0.87, 0.493, 0).normalize(), fusionAngle = Math.atan2(fusionAxis.y, fusionAxis.x);
+  const fusionAxis = new THREE.Vector3(0.20, 0.98, 0).normalize(), fusionAngle = Math.atan2(fusionAxis.y, fusionAxis.x);
   fusionWall.rotation.z = fusionAngle;
   const cosFusion = Math.cos(fusionAngle), sinFusion = Math.sin(fusionAngle), lysRadius = dockingLysosome.radius;
   const dockingWall = dockingLysosome.group.getObjectByName("VesicleMembrane"), dockingContents = dockingLysosome.group.getObjectByName("LumenCargoGranules");
@@ -463,6 +506,13 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     const c = THREE.MathUtils.clamp(x, 0, 1);
     return c * c * (3 - 2 * c);
   };
+  function updatePhagosomeSection() {
+    // An organelle cutaway uses its own depth, rather than the cell-radius
+    // plane that could erase the entire smaller fused lobe. Both views share it.
+    group.updateWorldMatrix(true, false);
+    const cut = THREE.MathUtils.lerp(1.16, -.32, group.userData.sectionAmount ?? .71);
+    phagosomePlane.set(new THREE.Vector3(0, 0, -1), phago.position.z + cut).applyMatrix4(group.matrixWorld);
+  }
   function updateCup(closure) {
     const p = cupGeometry.attributes.position;
     for (let u = 0; u <= 42; u++) for (let w = 0; w <= 64; w++) {
@@ -561,6 +611,7 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     organelleLocations.get("phagosome").position.copy(progressPosition);
     organelleLocations.get("lysosome").position.copy(joined ? lysosomes[1].base : worldLysCenter);
     group.userData.journey = { progress, phase: progress < 0.18 ? "engulfment_open_cup" : progress < 0.45 ? "closed_phagosome_transport" : progress < 0.63 ? "lysosome_docking" : progress < 0.72 ? "closed_fusion_compartment" : "enzymatic_digestion", membraneClosed: progress >= 0.18, cargoResidualScale: residue, enzymesInsideClosedCompartment: true, transferredHydrolases: transferred, totalHydrolases: enzymeSeeds.length };
+    updatePhagosomeSection();
   }
   setProgress(0.44);
   const goldTrack = standard("#c5ad76", 0.46, { transparent: true, opacity: 0.71 }), blueTrack = standard("#9ebcc3", 0.49, { transparent: true, opacity: 0.6 }), filamentMat = standard("#a7bdc0", 0.62, { transparent: true, opacity: 0.47 });
@@ -583,7 +634,7 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     add(line, "cytoskeleton");
   }
   location("cytoskeleton", [3.45, -3.6, 0.5], 1.3);
-  const granuleMat = standard("#ffffff", 0.57, { bumpScale: 5e-3 }), granuleGeo = proteinCluster(), grains = [], colors = ["#8fafc2", "#bba4ce", "#d7bba4", "#87a8b2", "#bd98bb", "#d8c58f", "#bdc9d0"];
+  const granuleMat = standard("#c0c6bb", 0.85, { bumpScale: 2e-3,envMapIntensity:.18 }), granuleGeo = proteinCluster(), grains = [], colors = ["#80a8b3", "#ad91bd", "#d6b88c", "#799ba7", "#b08aaa", "#dfc277", "#bdc9c1"];
   for (let i = 0; i < 1800; i++) {
     let x, y, z;
     for (let tries = 0; tries < 60; tries++) {
@@ -596,12 +647,23 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     }
     grains.push({ p: [x, y, z], s: [0.04 + rand() * 0.038, 0.04 + rand() * 0.037, 0.04 + rand() * 0.025], rot: [rand() * 6, rand() * 6, rand() * 6], c: colors[i % colors.length] });
   }
-  const molecularCrowd = instance("ribosome", granuleGeo, granuleMat, grains);
+  // Background crowding is context, not 1,800 equally salient unnamed actors.
+  // Keep a deterministic sparse subset while preserving the generator's RNG
+  // stream and all downstream anatomy/trajectory placements.
+  for (let i = 0; i < grains.length; i++) {
+    const size = i % 31 === 0 ? 1.08 : i % 7 === 0 ? 0.84 : 0.58;
+    grains[i].s = grains[i].s.map(axis => axis * size);
+  }
+  const backgroundTone = new THREE.Color("#aebbc1"), mutedColor = new THREE.Color();
+  const overviewGrains = grains.filter((_, i) => i % 6 === 0);
+  for (const grain of overviewGrains) grain.c = "#" + mutedColor.set(grain.c).lerp(backgroundTone, .68).getHexString();
+  const molecularCrowd = instance("ribosome", granuleGeo, granuleMat, overviewGrains);
   molecularCrowd.name = "PrescribedCytoplasmicMolecularDrift";
   molecularCrowd.userData.organelleId = "cytoplasm";
   molecularCrowd.userData.pickThrough = true;
+  molecularCrowd.userData.teachingBackground = { identity: "Unresolved macromolecular crowding; not assigned to a specific molecule", generated: 1800, displayed: overviewGrains.length, decorativeOnly: true };
   pickables.splice(pickables.indexOf(molecularCrowd), 1);
-  const driftBases = grains.map((grain, i) => {
+  const driftBases = overviewGrains.map((grain, i) => {
     const base = new THREE.Vector3(...grain.p), cellQ = (base.x / 5.7) ** 2 + (base.y / 5.8) ** 2 + (base.z / 3.9) ** 2, nuclearQ = ((base.x - nc.x) / 2.45) ** 2 + ((base.y - nc.y) / 2.65) ** 2 + ((base.z - nc.z) / 1.7) ** 2;
     let fade = THREE.MathUtils.clamp((0.9 - cellQ) / 0.2, 0, 1) * THREE.MathUtils.clamp((nuclearQ - 1) / 0.3, 0, 1);
     for (const vesicle of lysosomes) fade *= THREE.MathUtils.clamp((base.distanceTo(vesicle.base) - vesicle.radius - 0.15) / 0.25, 0, 1);
@@ -614,10 +676,14 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     const a = rand() * TAU, r = 5.45 + rand() * 0.3;
     corticalMolecules.push({ p: [Math.cos(a) * r, Math.sin(a) * r, -1.25 + rand() * 2], r: 0.034 + rand() * 0.045, c: colors[i % colors.length] });
   }
-  const corticalCrowd = instance("membrane", granuleGeo, standard("#ffffff", 0.49, { bumpScale: 5e-3 }), corticalMolecules);
+  for (const molecule of corticalMolecules) molecule.r *= 0.78;
+  const overviewCorticalMolecules = corticalMolecules.filter((_, i) => i % 5 === 0);
+  for (const molecule of overviewCorticalMolecules) molecule.c = "#" + mutedColor.set(molecule.c).lerp(backgroundTone, .74).getHexString();
+  const corticalCrowd = instance("membrane", granuleGeo, standard("#bdc5b8", 0.86, { bumpScale: 2e-3,envMapIntensity:.18 }), overviewCorticalMolecules);
   corticalCrowd.name = "CorticalMolecularCrowding";
   corticalCrowd.userData.pickThrough = true;
   corticalCrowd.userData.organelleId = "cytoplasm";
+  corticalCrowd.userData.teachingBackground = { identity: "Unresolved cortical macromolecular crowding", generated: 470, displayed: overviewCorticalMolecules.length, decorativeOnly: true };
   pickables.splice(pickables.indexOf(corticalCrowd), 1);
   function batchStatic(parent, id, filter = () => true) {
     parent.updateWorldMatrix(true, true);
@@ -655,6 +721,7 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
     const z = THREE.MathUtils.lerp(5.6, -1.2, sectionAmount);
     plasmaMembrane.setSection(z);
     group.userData.sectionAmount = sectionAmount;
+    updatePhagosomeSection();
   }
   function surfaceRadius(direction) {
     const d = direction.clone().normalize();
@@ -666,6 +733,7 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
   function update(t, dt = 0) {
     if (disposed || dt <= 0) return;
     plasmaMembrane.update();
+    updatePhagosomeSection();
     if(!group.userData.sharedCytoplasmMotion) for (let i = 0; i < driftBases.length; i++) {
       const d = driftBases[i], a = d.amplitude, phase = d.phase;
       v.copy(d.base);
@@ -699,7 +767,9 @@ function createWholeAtlas({ createOrganelle, surfaceTextures = {} } = {}) {
   }
   group.userData = { ...group.userData, teachingOnly: true, description: "Reference-directed 3D macrophage cutaway; enlarged organelle and molecular proportions for exhibition. All surfaces are meshes, not a raster backdrop.", sectionAmount, foldPatches: plasmaMembrane.diagnostics().foldPatches };
   group.updateWorldMatrix(true, true);
-  return { group, pickables, organelleLocations, setSection, setProgress, surfaceRadius, membraneSurface: plasmaMembrane.membraneSurface, plasmaMembrane, update, dispose, radius: 7.8, components: { nucleus: nuclearPlaced, golgi: golgiPlaced, mitochondria, lysosomes, microtubuleTracks }, nuclearPoreSites, metadata: { teachingOnly: true, organelleCount: organelleLocations.size, foldPatches: plasmaMembrane.diagnostics().foldPatches, representativeVesicleCounts: { lysosome: 3, endosome: 3, phagosome: 1, peroxisome: 3 }, vesicleTeachingScope: "Representative stages and content domains; shapes overlap and displayed counts are not an abundance measurement", erCisternae: 11, erIntercisternalSharedNecks: 20, continuousNuclearER: true, nuclearSharedPorts: 1, nuclearPores: 32, golgiCisternae: golgiPlaced?.component.stats.cisternae ?? 0, golgiTGN: Boolean(golgiPlaced?.component.stats.continuousTGN), mitochondria: mitoSites.length } };
+  const phagosome = { group: phago, fusionWall, cup, cargo, fragments: phagoFragments, dockingContents, enzymeInstances,
+    createInspection: ({ cloneMaterial } = {}) => { updatePhagosomeSection(); return createPhagosomeInspection({ phago, fusionWall, cup, dockingContents, enzymeInstances, membraneMaterials: [phagoMat, fusionLysMat], shellPlane: phagosomePlane, journey: group.userData.journey, cloneMaterial }); } };
+  return { group, pickables, organelleLocations, setSection, setProgress, surfaceRadius, membraneSurface: plasmaMembrane.membraneSurface, plasmaMembrane, update, dispose, radius: 7.8, components: { phagosome, nucleus: nuclearPlaced, golgi: golgiPlaced, mitochondria, lysosomes, endosomes: endosomeComponents, peroxisomes: peroxisomeComponents, microtubuleTracks }, nuclearPoreSites, metadata: { teachingOnly: true, organelleCount: organelleLocations.size, foldPatches: plasmaMembrane.diagnostics().foldPatches, representativeVesicleCounts: { lysosome: 3, endosome: 3, phagosome: 1, peroxisome: 3 }, vesicleTeachingScope: "Representative stages and content domains; shapes overlap and displayed counts are not an abundance measurement", erCisternae: 11, erIntercisternalSharedNecks: 20, continuousNuclearER: true, nuclearSharedPorts: 1, nuclearPores: 32, golgiCisternae: golgiPlaced?.component.stats.cisternae ?? 0, golgiTGN: Boolean(golgiPlaced?.component.stats.continuousTGN), mitochondria: mitoSites.length } };
 }
 export {
   createWholeAtlas

@@ -1,9 +1,16 @@
 import {createMembraneCollisionQueries} from './membrane-collision.js';
+import {createCytoskeletonMorphology} from './cytoskeleton-morphology.js';
 // Standalone three-network teaching candidate. Host THREE only; no scene mutation.
 export const CYTOSKELETON_SOURCES = Object.freeze([
+  {title:'Seta et al. 2023 — macrophage microtubule meshwork, edge bundles and astral MTs',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC9866147/',doi:'10.3390/ijms24021373',scope:'THP-1-derived human macrophages and murine RAW264.7 cells, fixation/confocal and live SiR-tubulin imaging. Coexisting astral and curved peripheral/basal networks inform the selected mixed organisation. The model does not reproduce a specific cell, adhesion state or measured nucleation map; displayed free segment ends are not nucleation labels.'},
+  {title:'Correia et al. 1999 — adhesion-dependent macrophage vimentin organisation',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC2156141/',doi:'10.1083/jcb.146.4.831',scope:'Mouse macrophage cell lines and adhesion-dependent actin/vimentin organisation. Supports showing open cytoplasmic strands and local associations rather than one universal nuclear cage; this model does not reproduce the paper\'s adhesion geometry or assembly dynamics.'},
   {title:'Blocker et al. 1997 — bidirectional phagosome movement',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC2139871/',doi:'10.1083/jcb.137.1.113',scope:'Microtubule/motor-dependent phagosome movement; the few small carriers here are teaching representatives, not measured trajectories or motor kinetics.'},
   {title:'Jaumouille et al. 2014 — actin constraints on Fc-gamma receptors',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC4083245/',doi:'10.1016/j.devcel.2014.04.031',scope:'Actin-dependent receptor mobility/clustering; the designated cortical uptake patch is schematic, not a measured receptor or actin map.'},
-  {title:'Patteson et al. 2019 — vimentin and nuclear protection',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC6891099/',doi:'10.1083/jcb.201902046',scope:'Fibroblast experiments, not macrophage measurements. The vimentin-like cage depicts a morphological support concept only.'},
+  {title:'Patteson et al. 2019 — vimentin and nuclear protection',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC6891099/',doi:'10.1083/jcb.201902046',scope:'Mouse embryonic fibroblasts, not macrophage measurements. The irregular juxtanuclear and peripheral strands depict a morphological support concept only.'},
+  {title:'Hartwig & Shevlin 1986 — macrophage peripheral actin architecture',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC2114287/',doi:'10.1083/jcb.103.3.1007',scope:'Extracted, spread lung macrophage cytoskeletons; branched/cross-linked peripheral architecture, not a native whole-cell segmentation. Not every overlap is an Arp2/3 branch.'},
+  {title:'Polarized microtubule remodeling in reactive microglia, 2023',url:'https://www.nature.com/articles/s41467-023-41891-6',doi:'10.1038/s41467-023-41891-6',scope:'Primary murine microglia with and without LPS; curved/buckled peripheral MTs and condition-dependent radial organisation. This teaching network is not an LPS-state or macrophage-specific measurement.'},
+  {title:'Zimmet et al. 2020 — human Arp2/3 activation',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC7274804/',doi:'10.1126/sciadv.aaz7651',scope:'Purified human Arp2/3 cryo-EM and biochemical reconstitution; approximately 70-degree daughter branching informs selected local junctions only, not every cortical crossing.'},
+  {title:'Barger et al. 2022 — primary macrophage F-actin organisation',url:'https://pmc.ncbi.nlm.nih.gov/articles/PMC9727803/',doi:'10.1091/mbc.E22-06-0210',scope:'Murine bone-marrow-derived macrophages, Fc-receptor phagocytosis and light-sheet/confocal imaging; organisation depends on target and myosin context and differs from macrophage-like cell lines. Local patches are selected teaching domains, not a universal resting distribution.'},
 ]);
 
 export function createCytoskeletonNetwork({THREE,whole=null,surfaceRadius=null,nuclearBounds=null,detail=false}={}) {
@@ -61,7 +68,7 @@ export function createCytoskeletonNetwork({THREE,whole=null,surfaceRadius=null,n
   const membraneQueries=whole?createMembraneCollisionQueries({THREE,whole}):null;
   function safePoint(p,margin=.04) {const r=p.length(),inside=p.x>=keepout.min.x-margin&&p.x<=keepout.max.x+margin&&p.y>=keepout.min.y-margin&&p.y<=keepout.max.y+margin&&p.z>=keepout.min.z-margin&&p.z<=keepout.max.z+margin;return !inside&&r+margin<cellRadius(p.clone().normalize());}
   function validateGeometry(g,name) {const p=g.attributes.position,v=V();for(let i=0;i<p.count;i++)if(!safePoint(v.fromBufferAttribute(p,i),.018)||membraneQueries?.nearSurface(v,.006)){rejected.push({name,reason:'Raw surface vertex failed nucleus-box or actual-cell clearance',vertex:i});return false;}return true;}
-  function material(color,extra={}) {return ownM(new THREE.MeshStandardMaterial({color,roughness:.58,metalness:.005,side:THREE.DoubleSide,...extra}));}
+  function material(color,extra={}) {return ownM(new THREE.MeshStandardMaterial({color,roughness:.72,metalness:0,side:THREE.DoubleSide,...extra}));}
   const mtMaterial=material('#ffffff',{vertexColors:true}),actinMaterial=material('#8dabb1'),ifMaterial=material('#a18fad'),mtocMaterial=material('#c8b489',{transparent:true,opacity:.12,depthWrite:false});
   function tag(o,key){o.userData={...o.userData,teachingOnly:true,organelleId:'cytoskeleton',componentKey:key};return o;}
   function append(parent,g,m,name,key,validate=true) {
@@ -102,14 +109,14 @@ export function createCytoskeletonNetwork({THREE,whole=null,surfaceRadius=null,n
     for(let i=0;i<=steps;i++){curve.getPointAt(i/steps,point);if(membraneQueries.nearSurface(point,radius+.025))return false;if(i&&membraneQueries.segmentHits(previous,point,{firstOnly:true}).length)return false;previous.copy(point);}return true;
   }
   const curveSafe=(curve,r=.04)=>{for(let i=0;i<=128;i++)if(!safePoint(curve.getPoint(i/128),r))return false;return true;};
+  function corticalPoint(d,inset=.29){d=d.clone().normalize();return d.multiplyScalar(cellRadius(d)-inset);}
+  // This conservative support surface only bounds the routes. It is never
+  // rendered as a cage, a membrane, or equally spaced latitude/longitude arcs.
+  const cageExtent=nucleusBox.getSize(V()).multiplyScalar(.5).addScalar(.20);
+  function cagePoint(direction){const d=direction.clone().normalize(),den=(Math.abs(d.x/cageExtent.x)**4+Math.abs(d.y/cageExtent.y)**4+Math.abs(d.z/cageExtent.z)**4),r=(3/den)**.25;return nucleusCenter.clone().addScaledVector(d,r);}
+  const morphology=createCytoskeletonMorphology({THREE,cellRadius,corticalPoint,cagePoint,nucleusCenter});
   const routes=sourceTracks.map((points,index)=>{
-    const start=points[0].clone().add(mtoc.clone().sub(originalMTOC)),end=points.at(-1).clone();
-    const candidates=[{points:[start,points[1].clone(),end],method:'existing-middle-and-end-with-safe-MTOC'}];
-    for(const z of [2.7,3.0,-2.65])candidates.push({points:[start,V((start.x+end.x)*.5,(start.y+end.y)*.5,z),V(end.x*.88,end.y*.88,z),end],method:'existing-end-with-cytoplasmic-detour'});
-    for(const z of [2.45+.15*Math.sin(index),2.85,-2.65]){
-      const projected=end.clone();projected.z=z;const len=projected.length(),d=projected.clone().normalize();projected.multiplyScalar(Math.min(1,(cellRadius(d)-.45)/len));
-      candidates.push({points:[start,start.clone().lerp(projected,.5).add(V(.08*Math.sin(index),.07*Math.cos(index),.08)),projected],method:'existing-azimuth-projected-to-safe-cytoplasm'});
-    }
+    const candidates=morphology.microtubuleCandidates(points,index,mtoc,originalMTOC);
     let chosen=null;for(const candidate of candidates){const curve=new THREE.CatmullRomCurve3(candidate.points,false,'centripetal');if(curveSafe(curve)&&membraneSafeCurve(curve,.031)){chosen={curve,index,method:candidate.method};break;}}
     routeRecords.push({index,accepted:!!chosen,method:chosen?.method??'omitted-for-actual-membrane-clearance'});return chosen;
   }).filter(Boolean);
@@ -125,27 +132,10 @@ export function createCytoskeletonNetwork({THREE,whole=null,surfaceRadius=null,n
     const a=i/80*TAU,span=.24+.31*(.5+.5*Math.sin(i*2.37));oldActin.push(Array.from({length:27},(_,j)=>V(5.4*Math.cos(a+span*j/26),5.4*Math.sin(a+span*j/26),.1)));
   }
   if(oldActin.length!==80)throw new Error('Expected eighty original actin axes; unsupported whole batch layout');
-  function corticalPoint(d,inset=.29){d=d.clone().normalize();return d.multiplyScalar(cellRadius(d)-inset);}
-  const actinCurves=oldActin.map((axis,k)=>{
-    let a=Math.atan2(axis[0].y,axis[0].x),b=Math.atan2(axis.at(-1).y,axis.at(-1).x);while(b<a)b+=TAU;
-    const points=[],local=k>=64,baseZ=.72*Math.sin(k*2.399963),neighborhood=V(1,.05,.2).normalize(),e1=V(-neighborhood.y,neighborhood.x,0).normalize(),e2=V().crossVectors(neighborhood,e1).normalize();
-    for(let j=0;j<=24;j++){const t=j/24;let d;
-      if(local){const phi=(k-64)/16*TAU+t*(1.1+.6*Math.sin(k)**2),angle=.075+.025*((k-64)%4);d=neighborhood.clone().addScaledVector(e1,angle*Math.cos(phi)).addScaledVector(e2,angle*Math.sin(phi)).normalize();}
-      else{const angle=a+(b-a)*t,z=THREE.MathUtils.clamp(baseZ+.07*Math.sin(Math.PI*t)*Math.cos(k),-.8,.8),r=Math.sqrt(1-z*z);d=V(Math.cos(angle)*r,Math.sin(angle)*r,z);}
-      points.push(corticalPoint(d));
-    }
-    return {curve:new THREE.CatmullRomCurve3(points,false,'centripetal'),local,index:k};
-  });
-  // A rounded conservative cage outside the actual nuclear AABB, not an invented membrane.
-  const cageExtent=nucleusBox.getSize(V()).multiplyScalar(.5).addScalar(.20);
-  function cagePoint(direction){const d=direction.clone().normalize(),den=(Math.abs(d.x/cageExtent.x)**4+Math.abs(d.y/cageExtent.y)**4+Math.abs(d.z/cageExtent.z)**4),r=(3/den)**.25;return nucleusCenter.clone().addScaledVector(d,r);}
-  const ifCurves=[];
-  for(let k=0;k<8;k++){const phi=.35+(Math.PI-.7)*k/7,points=[];for(let j=0;j<64;j++){const a=j/64*TAU;points.push(cagePoint(V(Math.sin(phi)*Math.cos(a),Math.cos(phi),Math.sin(phi)*Math.sin(a))));}ifCurves.push({curve:new THREE.CatmullRomCurve3(points,true,'centripetal'),closed:true,kind:'perinuclear-cage'});}
-  for(let k=0;k<12;k++){const a=k/12*TAU,points=[];for(let j=0;j<=48;j++){const phi=.16+(Math.PI-.32)*j/48;points.push(cagePoint(V(Math.sin(phi)*Math.cos(a+.07*Math.sin(phi*3+k)),Math.cos(phi),Math.sin(phi)*Math.sin(a+.07*Math.sin(phi*3+k)))));}ifCurves.push({curve:new THREE.CatmullRomCurve3(points,false,'centripetal'),closed:false,kind:'perinuclear-support'});}
-  for(let k=0;k<8;k++){const a=k/8*TAU,d=V(Math.cos(a),Math.sin(a),-.15).normalize(),start=cagePoint(d),end=corticalPoint(d,.6),mid=start.clone().lerp(end,.52).add(V(0,0,-.18*Math.sin(k)));ifCurves.push({curve:new THREE.CatmullRomCurve3([start,mid,end],false,'centripetal'),closed:false,kind:'cytoplasmic-extension'});}
+  const actinCurves=morphology.actin,ifCurves=morphology.intermediate;
   function splitOutsideMembranes(entry,radius){
     if(!membraneQueries)return [entry];
-    if(membraneSafeCurve(entry.curve,radius))return [entry];
+    if(curveSafe(entry.curve,radius+.025)&&membraneSafeCurve(entry.curve,radius))return [entry];
     const count=Math.max(64,Math.ceil(entry.curve.getLength()/.035)),runs=[];let begin=-1;
     for(let i=0;i<=count;i++){
       const p=entry.curve.getPointAt(i/count),ok=safePoint(p,radius+.025)&&!membraneQueries.containing(p).length&&!membraneQueries.nearSurface(p,radius+.035);
@@ -158,11 +148,18 @@ export function createCytoskeletonNetwork({THREE,whole=null,surfaceRadius=null,n
     }
     return runs;
   }
-  const safeActinCurves=actinCurves.flatMap(e=>splitOutsideMembranes(e,.014)),safeIFCurves=ifCurves.flatMap(e=>splitOutsideMembranes(e,.020));
+  const clippedActin=actinCurves.flatMap(e=>splitOutsideMembranes(e,.014));
+  const safeActinCurves=clippedActin.filter(entry=>{
+    if(!entry.branchParentId)return true;
+    if((entry.t0??0)>1e-5)return false;
+    return clippedActin.some(parent=>parent.id===entry.branchParentId&&Array.from({length:97},(_,i)=>parent.curve.getPointAt(i/96)).some(p=>p.distanceTo(entry.branchPoint)<.035));
+  }),safeIFCurves=ifCurves.flatMap(e=>splitOutsideMembranes(e,.020));
+  const naturalism={...morphology.stats,retainedActinDaughters:safeActinCurves.filter(e=>e.branchParentId).length,retainedIFClosedLoops:safeIFCurves.filter(e=>e.closed).length,microtubuleLengths:routes.map(e=>e.curve.getLength()),microtubuleEndpoints:routes.map(e=>e.curve.getPoint(1).toArray()),displayedMicrotubuleStarts:{centrosomalNeighbourhood:routes.filter(e=>e.curve.getPoint(0).distanceTo(mtoc)<.45).length,distributedSegments:routes.filter(e=>e.curve.getPoint(0).distanceTo(mtoc)>=.45).length,segmentEndsAreNotNucleationMarkers:true},allNetworksIllustrative:true};
+  group.userData.naturalism=naturalism;
   function makeClass(key,name){const g=tag(new THREE.Group(),key);g.name=name;group.add(g);groups[key]=g;return g;}
   makeClass('microtubules','MicrotubuleNetworkWithMTOC');makeClass('actin','ActinCortexAndUptakeNeighborhood');makeClass('intermediate-filaments','VimentinLikePerinuclearSupport');
   const carrierRoot=tag(new THREE.Group(),'transport-vesicles');carrierRoot.name='FiniteMicrotubuleMotorCarrierExamples';groups.microtubules.add(carrierRoot);groups['transport-vesicles']=carrierRoot;
-  const carrierMaterial=ownM(new THREE.MeshPhysicalMaterial({color:'#d7bd91',roughness:.2,metalness:0,transmission:.7,opacity:1,thickness:.02,ior:1.25,side:THREE.DoubleSide})),payloadMaterial=material('#9b7469',{roughness:.7}),motorMaterial=material('#a49ca9');
+  const carrierMaterial=ownM(new THREE.MeshPhysicalMaterial({color:'#d7bd91',roughness:.72,metalness:0,transmission:0,opacity:1,clearcoat:0,thickness:.02,ior:1.25,side:THREE.DoubleSide})),payloadMaterial=material('#9b7469',{roughness:.7}),motorMaterial=material('#a49ca9');
   const acceptedCarrierRoutes=[];
   function carrierPoint(route,u){const t=.74+.18*u,p=route.curve.getPoint(t),tangent=route.curve.getTangent(t).normalize(),side=V().crossVectors(tangent,V(0,1,0));if(side.lengthSq()<.01)side.set(0,0,1);return {point:p.addScaledVector(side.normalize(),.145),tangent};}
   for(const route of routes){let ok=true;for(let i=0;i<=96;i++)if(!safePoint(carrierPoint(route,i/96).point,.14)||membraneQueries?.containing(carrierPoint(route,i/96).point).length||membraneQueries?.nearSurface(carrierPoint(route,i/96).point,.15)){ok=false;break;}if(ok)acceptedCarrierRoutes.push(route);if(acceptedCarrierRoutes.length===3)break;}
@@ -206,7 +203,7 @@ export function createCytoskeletonNetwork({THREE,whole=null,surfaceRadius=null,n
   function getVisibilityBindings(){const bindings=[];group.traverse(object=>{if(object.isMesh)bindings.push({object,dependencies:getObjectVisibilityDependencies(object),role:object.userData.componentKey});});return bindings;}
   function getLabelVisibilityDependencies(){return null;}
   function setSectionPlanes(planes=null,{cortexOnly=true}={}){alive();if(planes!==null&&!Array.isArray(planes))throw new TypeError('planes must be host world-space Plane[] or null');for(const m of cortexOnly?[actinMaterial]:ownedMaterial){const old=m.clippingPlanes?.length??0;m.clippingPlanes=planes;if(old!==(planes?.length??0))m.needsUpdate=true;}}
-  function diagnostics(){return {quality,disposed,lastTime,initiallyInactiveForReplacement:true,sourceMicrotubuleTracks:sourceTracks.length,trackOrigin,originalMTOC:originalMTOC.toArray(),safeMTOC:mtoc.toArray(),obstacleSnapshotProgress:whole?.group?.userData?.journey?.progress??null,membraneFiltering:!!membraneQueries,sourceIFCurves:ifCurves.length,visibleIFSegments:safeIFCurves.length,recoveredActinAxes:whole?oldActin.length:0,actinOrigin:whole?'recovered-existing-80-axes':'deterministic-teaching-fallback-no-whole',acceptedRoutes:routes.length,routeRecords,rejected:[...rejected],budget:budgets(),nuclearBounds:{min:nucleusBox.min.toArray(),max:nucleusBox.max.toArray()},coordinateFrame:'whole.group local; parent group beneath whole.group',clearanceScope:'Actual raw cell, conservative nuclear AABB, and BVH triangle/clearance filtering against actual complete NEER, mitochondrial outer and active vesicle/fusion membranes at construction progress. Temporal/cross-story coexistence requires recheck when membrane geometry moves.',geometryInterpretation:'Hollow MT walls; schematic centriole barrels/PCM; peripheral F-actin arcs with a designated uptake patch; vimentin-like supporting strands, not macrophage-measured architecture.',bidirectionalCarrierMotion:'Finite cosine traversal on validated .74-.92 MT segments; no modulo teleport or organelle membrane delivery.',ownClock:false,dtZeroFreezes:true,sources:CYTOSKELETON_SOURCES};}
+  function diagnostics(){return {quality,disposed,lastTime,initiallyInactiveForReplacement:true,sourceMicrotubuleTracks:sourceTracks.length,trackOrigin,originalMTOC:originalMTOC.toArray(),safeMTOC:mtoc.toArray(),obstacleSnapshotProgress:whole?.group?.userData?.journey?.progress??null,membraneFiltering:!!membraneQueries,sourceIFCurves:ifCurves.length,visibleIFSegments:safeIFCurves.length,recoveredActinAxes:whole?oldActin.length:0,actinOrigin:'heterogeneous-cortical-filaments-and-local-branched-patches',acceptedRoutes:routes.length,routeRecords,rejected:[...rejected],naturalism,budget:budgets(),nuclearBounds:{min:nucleusBox.min.toArray(),max:nucleusBox.max.toArray()},coordinateFrame:'whole.group local; parent group beneath whole.group',clearanceScope:'Actual raw cell, conservative nuclear AABB, and BVH triangle/clearance filtering against actual complete NEER, mitochondrial outer and active vesicle/fusion membranes at construction progress. Temporal/cross-story coexistence requires recheck when membrane geometry moves.',geometryInterpretation:'Unequal curved hollow MTs with MTOC directionality; heterogeneous peripheral F-actin with selected connected daughter branches; unequal open vimentin-like juxtanuclear arcs and extensions, not a latitude/longitude cage or measured macrophage architecture.',bidirectionalCarrierMotion:'Finite cosine traversal on validated .74-.92 MT segments; no modulo teleport or organelle membrane delivery.',ownClock:false,dtZeroFreezes:true,sources:CYTOSKELETON_SOURCES};}
   function dispose(){if(disposed)return;for(const g of ownedGeometry)g.dispose();for(const m of ownedMaterial)m.dispose();ownedGeometry.clear();ownedMaterial.clear();cellCache.clear();membraneQueries?.dispose();const objects=[];group.traverse(o=>objects.push(o));for(const o of objects.reverse())o.clear();pickables.length=0;carrierRecords.length=0;disposed=true;}
   setQuality(quality);
   return {group,groups,pickables,setQuality,update,setSectionPlanes,diagnostics,getVisibilityBindings,getObjectVisibilityDependencies,getLabelVisibilityDependencies,dispose,

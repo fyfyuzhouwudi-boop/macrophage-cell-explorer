@@ -35,9 +35,7 @@ function createAtlasAnnotations({ sidebar, footer, guides = {}, scenarios = {}, 
   chips.hidden = true;
   chips.setAttribute("role", "group");
   chips.setAttribute("aria-label", "可见结构说明");
-  const tabs = detail.querySelector(".level-tabs");
-  if (tabs) tabs.insertAdjacentElement("afterend", chips);
-  else detail.append(chips);
+  detail.append(chips);
   const toggle = element("button", "atlas-annotations-toggle", "隐藏注释");
   toggle.type = "button";
   toggle.setAttribute("aria-pressed", "true");

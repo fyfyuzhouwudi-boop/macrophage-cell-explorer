@@ -18,6 +18,56 @@ function roundPoreCoordinates(u, v, nu, nv) {
 }
 const TAU = Math.PI * 2, NC = new THREE.Vector3(-2.25, 1.15, -0.05), SCALE = new THREE.Vector3(1.55, 1.83, 1.36);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+function erAngle(layer, t) {
+  return THREE.MathUtils.lerp(-2.95 + layer * .057 + .095 * Math.sin(layer * 1.3),
+    1.6 - layer * .075 + .11 * Math.sin(layer * 2.1), t);
+}
+// Shared parametric source for the actual wall and its whole-view ribosomes.
+// The rounded terminal interval ends before either intercisternal port row.
+function erWorldFrame(layer, t) {
+  const angle = erAngle(layer, t), rx = 2.31 + layer * .2, ry = 2.48 + layer * .19;
+  const warp = .16 * Math.sin(angle * 5 + layer * .075) + .065 * Math.sin(angle * 9 + layer * .075);
+  const center = V(NC.x + (rx + warp) * Math.cos(angle), NC.y + (ry + warp) * Math.sin(angle),
+    -.6 + .075 * layer + .16 * Math.sin(angle * 2) + .1 * Math.sin(angle * 5) + .025 * Math.sin(layer * .8));
+  const terminalSpan = .065 + .009 * Math.sin(layer * .87);
+  const endDistance = Math.min(t, 1 - t), x = THREE.MathUtils.clamp(endDistance / terminalSpan, 0, 1);
+  const taper = Math.sqrt(Math.max(0, 1 - (1 - x) ** 2));
+  const depth = (.82 + .18 * Math.sin(angle * 3 + .5) + .1 * Math.sin(angle * 5)) * taper;
+  const halfWidth = (.044 + .004 * Math.sin(angle * 4 + layer)) * taper;
+  // A common inclination keeps adjacent finite-depth cisternae from crossing.
+  // Layer-dependent inclination previously intersected their back surfaces.
+  const tilt = (.6 + .18 * Math.sin(angle * 3 + .7) + .1 * Math.sin(angle * 7)) * .3;
+  return { angle, center, depth, halfWidth, tilt, taper };
+}
+// The same smooth spatial deformation is used by every membrane face, shared
+// port, lumen witness and ribosome. Its monotone radial map varies cisternal
+// spacing without changing their order; a following z shear adds broad folds.
+// Nuclear projection and reserved organelle corridors remain fixed. This is an
+// exhibition morphology field, not a measured reconstruction of one cell.
+function shapeERWorldPoint(point2) {
+  const point = point2.clone(), dx = point.x - NC.x, dy = point.y - NC.y;
+  const radius = Math.hypot(dx / 2.2, dy / 2.36);
+  const outsideRectangle = (cx, cy, hx, hy) => Math.hypot(
+    Math.max(0, Math.abs(point.x - cx) - hx),
+    Math.max(0, Math.abs(point.y - cy) - hy),
+  );
+  const golgiClearance = THREE.MathUtils.smoothstep(outsideRectangle(.4, -2.62, 1.8, 1.3), 0, .55);
+  const uptakeClearance = THREE.MathUtils.smoothstep(outsideRectangle(4.2, 1.2, 2.15, 2.65), 0, .55);
+  const apicalSortingClearance = 1 - THREE.MathUtils.smoothstep(point.y, 3.65, 4.1);
+  const envelope = THREE.MathUtils.smoothstep(radius, 1.03, 1.6) * golgiClearance * uptakeClearance * apicalSortingClearance;
+  if (envelope === 0) return point;
+  const angle = Math.atan2(dy / 2.36, dx / 2.2), distance = Math.hypot(dx, dy);
+  // A common ordered radial map creates broad crowded and open cisternal
+  // domains instead of independent per-layer offsets or random vertex noise.
+  const radialShift = envelope * (.038 * Math.sin(radius * 12 + 1.7 * Math.sin(angle * 2 - .4))
+    + .013 * Math.sin(radius * 7 - angle * 2));
+  const radialScale = 1 + radialShift / radius;
+  point.x = NC.x + dx * radialScale;
+  point.y = NC.y + dy * radialScale;
+  point.z += envelope * (.31 * Math.sin(angle * 3 + distance * 2.1)
+    + .13 * Math.sin(angle * 5 - distance * 4.3 + 1.7));
+  return point;
+}
 function confineERWorldPoint(point2) {
   const radius = point2.length();
   if (radius < 1e-9) return point2.clone();
@@ -32,11 +82,45 @@ function confineERWorldPoint(point2) {
   const contractedRadius = safeRadius - band * Math.exp(-(radius - start) / band);
   return point2.clone().multiplyScalar((radius + weight * (contractedRadius - radius)) / radius);
 }
+// Bounded radial relief for both the standalone nucleus and the continuous
+// nuclear envelope. Smooth 3-D noise has no imposed sinusoidal ridge direction;
+// rotating successive octave coordinates reduces visible lattice alignment.
+// The multiplier is bounded to +/-0.6% and does not alter pore/neck topology.
+function nuclearSurfaceRelief(x, y, z) {
+  const hash = (ix, iy, iz) => {
+    let h = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(iz, 2147483647);
+    h = Math.imul(h ^ h >>> 13, 1274126177);
+    return ((h ^ h >>> 16) >>> 0) / 4294967295 * 2 - 1;
+  };
+  const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const valueNoise = (px, py, pz) => {
+    const ix = Math.floor(px), iy = Math.floor(py), iz = Math.floor(pz);
+    const fx = fade(px - ix), fy = fade(py - iy), fz = fade(pz - iz);
+    return lerp(
+      lerp(lerp(hash(ix, iy, iz), hash(ix + 1, iy, iz), fx),
+        lerp(hash(ix, iy + 1, iz), hash(ix + 1, iy + 1, iz), fx), fy),
+      lerp(lerp(hash(ix, iy, iz + 1), hash(ix + 1, iy, iz + 1), fx),
+        lerp(hash(ix, iy + 1, iz + 1), hash(ix + 1, iy + 1, iz + 1), fx), fy), fz);
+  };
+  let px = x * 6.4 + 17.31, py = y * 6.4 - 8.73, pz = z * 6.4 + 24.19;
+  let sum = 0;
+  for (const weight of [.57, .29, .14]) {
+    sum += weight * valueNoise(px, py, pz);
+    const nx = .36 * px + .48 * py - .8 * pz;
+    const ny = -.8 * px + .6 * py;
+    const nz = .48 * px + .64 * py + .6 * pz;
+    px = nx * 2.05 + 11.17;
+    py = ny * 2.05 - 7.43;
+    pz = nz * 2.05 + 3.29;
+  }
+  return 1 + .006 * sum;
+}
 function point(u, v, nu, nv, inner = false) {
   const rounded = roundPoreCoordinates(u, v, nu, nv);
   u = rounded.u;
   v = rounded.v;
-  const phi = u / nu * Math.PI, a = v / nv * TAU, s = Math.sin(phi), x = Math.cos(a) * s, y = Math.cos(phi), z = Math.sin(a) * s, indent = 1 - 0.25 * Math.exp(-((x - 0.8) ** 2 / 0.14 + y * y / 0.42)), scale = inner ? 0.955 : 1, n = 1 + 9e-3 * (Math.sin(x * 3 * 13.1 + y * 3 * 7.7 + z * 3 * 9.3) * 0.48 + Math.sin(x * 3 * 29.7 - y * 3 * 17.3 + z * 3 * 22.1) * 0.27 + Math.sin(x * 3 * 61.3 + y * 3 * 43.1 - z * 3 * 37.7) * 0.15);
+  const phi = u / nu * Math.PI, a = v / nv * TAU, s = Math.sin(phi), x = Math.cos(a) * s, y = Math.cos(phi), z = Math.sin(a) * s, indent = 1 - 0.25 * Math.exp(-((x - 0.8) ** 2 / 0.14 + y * y / 0.42)), scale = inner ? 0.955 : 1, n = nuclearSurfaceRelief(x, y, z);
   return V(x * 1.34 * indent * n * scale, y * 1.22 * n * scale, z * 1.1 * n * scale);
 }
 function orientConsistently(indices, positions) {
@@ -132,11 +216,7 @@ function createNuclearERGeometry({ detail = true } = {}) {
     const outer = point((h.u0 + h.u1) * 0.5, (h.v0 + h.v1) * 0.5, nu, nv), inner = outer.clone().multiplyScalar(0.955);
     poreSites.push({ outer, inner, direction: outer.clone().sub(inner).normalize() });
   }
-  const nuclearFaceCount = indices.length / 3, ports = [{ ring: boundary(nuclearPort, (u, v) => vertex(u, v)), refine: 2, name: "ONM" }], rows = detail ? 104 : 52, sides = 36, toLocal = (p) => p.clone().sub(NC).divide(SCALE), depth = (a) => 0.82 + 0.18 * Math.sin(a * 3 + 0.5) + 0.1 * Math.sin(a * 5), tilt = (a) => 0.6 + 0.18 * Math.sin(a * 3 + 0.7) + 0.1 * Math.sin(a * 7), angle = (j, t) => THREE.MathUtils.lerp(-2.95 + j * 0.057 + 0.095 * Math.sin(j * 1.3), 1.6 - j * 0.075 + 0.11 * Math.sin(j * 2.1), t);
-  function center(j, t) {
-    const a = angle(j, t), rx = 2.31 + j * 0.2, ry = 2.48 + j * 0.19, w = 0.16 * Math.sin(a * 5 + j * 0.075) + 0.065 * Math.sin(a * 9 + j * 0.075);
-    return V(NC.x + (rx + w) * Math.cos(a), NC.y + (ry + w) * Math.sin(a), -0.6 + 0.075 * j + 0.16 * Math.sin(a * 2) + 0.1 * Math.sin(a * 5) + 0.025 * Math.sin(j * 0.8));
-  }
+  const nuclearFaceCount = indices.length / 3, ports = [{ ring: boundary(nuclearPort, (u, v) => vertex(u, v)), refine: 2, name: "ONM" }], rows = detail ? 104 : 52, sides = 36, toLocal = (p) => p.clone().sub(NC).divide(SCALE), angle = erAngle, center = (layer, t) => erWorldFrame(layer, t).center;
   const layers = [], lumenPaths = [], connections = [];
   let erNuclearPort = null;
   for (let layer = 0; layer < 11; layer++) {
@@ -152,10 +232,10 @@ function createNuclearERGeometry({ detail = true } = {}) {
     }
     const path = [];
     for (let u = 0; u <= rows; u++) {
-      const t = u / rows, a = angle(layer, t), c = center(layer, t), ring = [];
+      const t = u / rows, frame = erWorldFrame(layer, t), a = frame.angle, c = frame.center, ring = [];
       path.push(toLocal(c));
       for (let v = 0; v < sides; v++) {
-        const chi = v / sides * TAU, rad = 0.044 + 4e-3 * Math.sin(a * 4 + layer), d = depth(a), across = rad * Math.cos(chi) + tilt(a) * Math.min(1, 0.3 + layer * 0.33) * d * Math.sin(chi);
+        const chi = v / sides * TAU, rad = frame.halfWidth, d = frame.depth, across = rad * Math.cos(chi) + frame.tilt * d * Math.sin(chi);
         ring.push(add(toLocal(c.clone().add(V(Math.cos(a) * across, Math.sin(a) * across, d * Math.sin(chi)))), t * 3, v / sides));
       }
       ringIds.push(ring);
@@ -274,17 +354,18 @@ function createNuclearERGeometry({ detail = true } = {}) {
   for (let i = 0; i < indices.length; i++) indices[i] = remap[indices[i]];
   let confinedVertices = 0, maxConfinementShift = 0;
   for (let i = 0; i < compact.length; i += 3) {
-    const world = V().fromArray(compact, i).multiply(SCALE).add(NC), confined = confineERWorldPoint(world);
-    if (world.equals(confined)) continue;
-    maxConfinementShift = Math.max(maxConfinementShift, world.distanceTo(confined));
-    confinedVertices++;
+    const world = shapeERWorldPoint(V().fromArray(compact, i).multiply(SCALE).add(NC)), confined = confineERWorldPoint(world);
+    if (!world.equals(confined)) {
+      maxConfinementShift = Math.max(maxConfinementShift, world.distanceTo(confined));
+      confinedVertices++;
+    }
     confined.sub(NC).divide(SCALE).toArray(compact, i);
   }
   for (let oldId = 0; oldId < remap.length; oldId++) {
     const id = remap[oldId];
     if (id >= 0) for (let axis = 0; axis < 3; axis++) positions[oldId * 3 + axis] = compact[id * 3 + axis];
   }
-  for (const path of lumenPaths) for (const p of path) p.copy(confineERWorldPoint(p.clone().multiply(SCALE).add(NC)).sub(NC).divide(SCALE));
+  for (const path of lumenPaths) for (const p of path) p.copy(confineERWorldPoint(shapeERWorldPoint(p.clone().multiply(SCALE).add(NC))).sub(NC).divide(SCALE));
   for (const connection2 of connections) for (let i = 0; i < connection2.path.length; i++) connection2.path[i].copy(ringCenter(connection2.rings[i]));
   const orientation = orientConsistently(indices, compact), geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(compact, 3));
@@ -299,10 +380,24 @@ function createNuclearERGeometry({ detail = true } = {}) {
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   geometry.computeBoundingBox();
-  const portCenter = ringCenter(ports[0].ring), normal = portCenter.clone().multiply(V(1 / 1.34 ** 2, 1 / 1.22 ** 2, 1 / 1.1 ** 2)).normalize(), pnsInterior = portCenter.clone().addScaledVector(normal, -0.025), connection = nuclearPath[4].clone(), erInterior = nuclearPath[nuclearPath.length - 1].clone().lerp(toLocal(center(0, 2 / rows)), 0.25), viewDirection = V(-0.55, 0.2, 1).normalize();
-  return { geometry, poreSites, anchors: { connection, connectionTarget: connection.clone(), connectionCamera: connection.clone().addScaledVector(viewDirection, 2.5), pnsInterior, erInterior, pnsSightTarget: nuclearPath[4].clone() }, metadata: { teachingOnly: true, erConfinement: { confinedVertices, maxWorldShift: maxConfinementShift, safeBodyMargin: 0.3, radialBand: 0.55 }, nuclearPores: 32, nuclearFaceCount, erCisternae: 11, intercisternalSharedNecks: 20, nuclearSharedPorts: 1, sharedPortVertexIds: ports[0].ring.map((id) => remap[id]), pnsERPath: [pnsInterior, ...nuclearPath, erInterior].map((p) => p.toArray()), erLumenPaths: lumenPaths.map((p) => p.map((v) => v.toArray())), erBendPaths: connections.slice(1).map((c) => c.path.map((p) => p.toArray())), ports: ports.map((p) => ({ name: p.name, ids: p.ring.map((id) => remap[id]) })), ...orientation, description: "One indexed membrane bounds PNS and eleven closed ER cisternae; one ONM and twenty intercisternal necks use shared boundary vertex IDs. The inner nuclear membrane remains intact. NPC channels connect nucleoplasm and cytosol separately from the PNS/ER lumen." } };
+  geometry.userData.cisternaMorphology = {
+    roundedTerminalPoles: true,
+    commonTiltMultiplier: .3,
+    terminalArcFraction: [.056, .074],
+    radialWaveAmplitudes: [.16, .065],
+    adjacentLayerPhases: [.075, .075],
+    sharedParametricRibosomePlacement: true,
+    orderedNonUniformSpacing: true,
+    commonSpatialDeformation: true,
+    measuredCoordinates: false,
+  };
+  const portCenter = ringCenter(ports[0].ring), normal = portCenter.clone().multiply(V(1 / 1.34 ** 2, 1 / 1.22 ** 2, 1 / 1.1 ** 2)).normalize(), pnsInterior = portCenter.clone().addScaledVector(normal, -0.025), connection = nuclearPath[4].clone(), erInterior = nuclearPath[nuclearPath.length - 1].clone().lerp(toLocal(confineERWorldPoint(shapeERWorldPoint(center(0, 2 / rows)))), 0.25), viewDirection = V(-0.55, 0.2, 1).normalize();
+  return { geometry, poreSites, anchors: { connection, connectionTarget: connection.clone(), connectionCamera: connection.clone().addScaledVector(viewDirection, 2.5), pnsInterior, erInterior, pnsSightTarget: nuclearPath[4].clone() }, metadata: { teachingOnly: true, erShape: { method: "Ordered angularly varying radial map followed by a common z shear", maximumRadialShift: .051, maximumShear: .44, nuclearProjectionUnchanged: true, radialOrderPreserved: true, measuredCoordinates: false }, erConfinement: { confinedVertices, maxWorldShift: maxConfinementShift, safeBodyMargin: 0.3, radialBand: 0.55 }, nuclearPores: 32, nuclearFaceCount, erCisternae: 11, intercisternalSharedNecks: 20, nuclearSharedPorts: 1, sharedPortVertexIds: ports[0].ring.map((id) => remap[id]), pnsERPath: [pnsInterior, ...nuclearPath, erInterior].map((p) => p.toArray()), erLumenPaths: lumenPaths.map((p) => p.map((v) => v.toArray())), erBendPaths: connections.slice(1).map((c) => c.path.map((p) => p.toArray())), ports: ports.map((p) => ({ name: p.name, ids: p.ring.map((id) => remap[id]) })), ...orientation, description: "One indexed membrane bounds PNS and eleven closed ER cisternae; one ONM and twenty intercisternal necks use shared boundary vertex IDs. The inner nuclear membrane remains intact. NPC channels connect nucleoplasm and cytosol separately from the PNS/ER lumen." } };
 }
 export {
+  nuclearSurfaceRelief,
   confineERWorldPoint,
+  shapeERWorldPoint,
+  erWorldFrame,
   createNuclearERGeometry
 };

@@ -1,7 +1,10 @@
 import * as THREE from "three";
+import { buildPeroxisome } from "./compartment-models.js";
+import { buildUltrastructureSortingEndosome, buildUltrastructurePhagosome, buildUltrastructureLysosome } from "./compartment-ultrastructure.js";
+import { applyWholeOrganelleFinish } from "./whole-organelle-finish.js";
 import { buildPlasmaMembraneDetail } from "./plasma-membrane-detail.js";
 import { createContinuousMitoCore } from "./atlas-geometry.js";
-import { createNuclearERGeometry } from "./nuclear-er-continuum.js";
+import { createNuclearERGeometry, nuclearSurfaceRelief } from "./nuclear-er-continuum.js";
 import { attachSmoothERNetwork, attachSERToNuclearER } from "./er-smooth-network.js";
 import { createTransGolgiNetwork } from "./secretory-golgi-network.js";
 import MICRO_TEXTURES from "./micro-texture-data.js";
@@ -85,13 +88,34 @@ function pointsInBall(count, random, radius = 1) {
   }
   return a;
 }
+// Roughness is linear data. The original dark relief map multiplied the host
+// roughness by as little as .44, creating polished spots on otherwise soft tissue.
+function restrainedRoughness(grain) {
+  const key = grain.uuid + ":linear-roughness:.86-1";
+  if (buildTexturePool?.has(key)) return buildTexturePool.get(key);
+  const source = grain.image.data, bytes = new Uint8Array(source.length);
+  for (let i = 0; i < bytes.length; i += 4) {
+    const value = Math.round(255 * .86 + source[i + 1] * .14);
+    bytes[i] = bytes[i + 1] = bytes[i + 2] = value; bytes[i + 3] = 255;
+  }
+  const texture = new THREE.DataTexture(bytes, grain.image.width, grain.image.height, THREE.RGBAFormat);
+  texture.name = "RestrainedLinearTissueRoughness";
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.copy(grain.repeat);
+  texture.generateMipmaps = true; texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter; texture.anisotropy = 4;
+  texture.colorSpace = THREE.NoColorSpace; texture.needsUpdate = true;
+  if (buildTexturePool) buildTexturePool.set(key, texture);
+  return texture;
+}
 function physical(color, extra = {}) {
   const grain = microTexture("membrane", 1.8), albedo = softAlbedo(grain, 0.62);
-  return new THREE.MeshPhysicalMaterial({ color, roughness: 0.48, metalness: 8e-3, clearcoat: 0.38, clearcoatRoughness: 0.29, side: THREE.DoubleSide, envMapIntensity: 0.85, map: albedo, bumpMap: grain, bumpScale: 26e-4, roughnessMap: grain, ...extra });
+  const material = new THREE.MeshPhysicalMaterial({ color, roughness: 0.60, metalness: 0, clearcoat: 0.025, clearcoatRoughness: 0.68, specularIntensity: 0.5, ior: 1.38, side: THREE.DoubleSide, envMapIntensity: 0.62, opacity: 1, transparent: false, transmission: 0, map: albedo, bumpMap: grain, bumpScale: 26e-4, roughnessMap: restrainedRoughness(grain), ...extra });
+  material.userData.tissueSurfaceResponse = { version: 1, treatment: "soft diffuse tissue with broad, weak interface reflection", linearRoughnessMapRange: [.86, 1], illustrativeOnly: true };
+  return material;
 }
 // Keep existing membrane shape and color; repeated art samples are not anatomy.
 function continuousMembrane(color, extra = {}) {
-  const material = physical(color, { roughness: 0.46, clearcoat: 0.2, clearcoatRoughness: 0.4, map: null, bumpMap: null, bumpScale: 0, roughnessMap: null, ...extra });
+  const material = physical(color, { roughness: 0.58, clearcoat: 0.04, clearcoatRoughness: 0.68, map: null, bumpMap: null, bumpScale: 0, roughnessMap: null, ...extra });
   material.userData.atlasMaterialRole = "membrane";
   material.userData.continuousSurfaceV1 = true;
   return material;
@@ -159,9 +183,9 @@ function cylinderBetween(parent, a, b, radius, material, sides = 10) {
   return m;
 }
 function membraneSurface(parent, color, detail, { radius = 1, axes = V(1, 1, 1), seed = 1, thickness = 0.026, continuous = false } = {}) {
-  const map = relief(seed), mat = continuous ? continuousMembrane(color, { roughness: 0.43, clearcoat: 0.24 }) : physical(color, { bumpMap: map, bumpScale: detail ? 6e-3 : 5e-3, roughness: 0.32, clearcoat: 0.55 }), outer = sphere(parent, organicSphere(radius, detail ? 96 : 36, 0.014, seed, axes), mat);
+  const map = relief(seed), mat = continuous ? continuousMembrane(color, { roughness: 0.58, clearcoat: 0.04 }) : physical(color, { bumpMap: map, bumpScale: detail ? 6e-3 : 5e-3, roughness: 0.59, clearcoat: 0.045 }), outer = sphere(parent, organicSphere(radius, detail ? 96 : 36, 0.014, seed, axes), mat);
   outer.userData.shell = true;
-  const innerMat = continuous ? continuousMembrane(color, { roughness: 0.54, clearcoat: 0.12 }) : physical(color, { roughness: 0.48, bumpMap: map, bumpScale: 8e-3 }), inner = sphere(parent, organicSphere(radius - thickness, detail ? 80 : 30, 0.013, seed, axes), innerMat);
+  const innerMat = continuous ? continuousMembrane(color, { roughness: 0.63, clearcoat: 0.02 }) : physical(color, { roughness: 0.63, clearcoat: 0.02, bumpMap: map, bumpScale: 8e-3 }), inner = sphere(parent, organicSphere(radius - thickness, detail ? 80 : 30, 0.013, seed, axes), innerMat);
   inner.userData.shell = true;
   return { outer, inner, mat, innerMat, map };
 }
@@ -236,7 +260,7 @@ function nuclearPoint(u, v, nu, nv, inner = false) {
   const rounded = roundPoreCoordinates(u, v, nu, nv);
   u = rounded.u;
   v = rounded.v;
-  const phi = u / nu * Math.PI, a = v / nv * TAU, s = Math.sin(phi), x = Math.cos(a) * s, y = Math.cos(phi), z = Math.sin(a) * s, indent = 1 - 0.25 * Math.exp(-((x - 0.8) ** 2 / 0.14 + y * y / 0.42)), scale = inner ? 0.955 : 1, n = 1 + 9e-3 * noise(x * 3, y * 3, z * 3);
+  const phi = u / nu * Math.PI, a = v / nv * TAU, s = Math.sin(phi), x = Math.cos(a) * s, y = Math.cos(phi), z = Math.sin(a) * s, indent = 1 - 0.25 * Math.exp(-((x - 0.8) ** 2 / 0.14 + y * y / 0.42)), scale = inner ? 0.955 : 1, n = nuclearSurfaceRelief(x, y, z);
   return V(x * 1.34 * indent * n * scale, y * 1.22 * n * scale, z * 1.1 * n * scale);
 }
 function perforatedNucleus(detail) {
@@ -275,7 +299,7 @@ function perforatedNucleus(detail) {
   return { geometry: geoData(p, idx, uv), poreSites };
 }
 function poreComplex(detail, { scale = 1, color = "#8e7b99", membrane = true } = {}) {
-  const group = new THREE.Group(), mat = physical(color, { roughness: 0.4 }), beadMat = physical("#a79aaf", { roughness: 0.48 });
+  const group = new THREE.Group(), mat = physical(color, { roughness: 0.58 }), beadMat = physical("#a79aaf", { roughness: 0.60 });
   if (membrane) {
     const s = new THREE.Shape();
     s.absarc(0, 0, 1.22, 0, TAU, false);
@@ -284,7 +308,7 @@ function poreComplex(detail, { scale = 1, color = "#8e7b99", membrane = true } =
     s.holes.push(h);
     const g = new THREE.ExtrudeGeometry(s, { depth: 0.13, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.035, bevelThickness: 0.025, curveSegments: 80 });
     g.translate(0, 0, -0.065);
-    const patch = new THREE.Mesh(g, continuousMembrane("#8e82ac", { roughness: 0.46, clearcoat: 0.2 }));
+    const patch = new THREE.Mesh(g, continuousMembrane("#8e82ac", { roughness: 0.61, clearcoat: 0.035 }));
     patch.userData.shell = true;
     group.add(patch);
   }
@@ -310,7 +334,7 @@ function poreComplex(detail, { scale = 1, color = "#8e7b99", membrane = true } =
   return group;
 }
 function buildNucleus(group, detail, ctx) {
-  const { geometry, poreSites } = perforatedNucleus(detail), map = relief(3), material = continuousMembrane("#8872aa", { roughness: 0.46, clearcoat: 0.2 }), envelope = new THREE.Mesh(geometry, material);
+  const { geometry, poreSites } = perforatedNucleus(detail), map = relief(3), material = continuousMembrane("#8872aa", { roughness: 0.61, clearcoat: 0.035 }), envelope = new THREE.Mesh(geometry, material);
   envelope.userData.shell = true;
   envelope.name = "PerforatedDoubleNuclearMembrane";
   group.add(envelope);
@@ -330,7 +354,7 @@ function buildNucleus(group, detail, ctx) {
       }
     }
   }
-  const npc = beads(group, npcPoints, 1, physical("#94839f", { roughness: 0.46 }), { scales: npcScales, segments: detail ? 24 : 6, name: "ThirtyTwoEightFoldNPCAssemblies" });
+  const npc = beads(group, npcPoints, 1, physical("#94839f", { roughness: 0.59 }), { scales: npcScales, segments: detail ? 24 : 6, name: "ThirtyTwoEightFoldNPCAssemblies" });
   npc.userData.shell = true;
   ctx.shell.push(npc);
   const random = rng(213), chromatinMat = physical("#8d71a2", { roughness: 0.65 }), filamentMat = physical("#b699c4", { roughness: 0.55 }), nucleolusMat = physical("#674d87", { bumpMap: map, bumpScale: 0.022, roughness: 0.55 });
@@ -364,7 +388,7 @@ function buildNucleus(group, detail, ctx) {
 }
 function buildNuclearER(group, detail, ctx, id) {
   buildNucleus(group, detail, ctx);
-  const continuum = attachSERToNuclearER(createNuclearERGeometry({ detail })), envelope = group.getObjectByName("PerforatedDoubleNuclearMembrane"), nuclearMaterial = envelope.material, erMaterial = continuousMembrane("#7198a7", { roughness: 0.45, clearcoat: 0.22 }), neckMaterial = continuousMembrane("#96b6c1", { roughness: 0.48, clearcoat: 0.18 }), smoothERMaterial = continuousMembrane("#95b8b0", { roughness: 0.49, clearcoat: 0.2 });
+  const continuum = attachSERToNuclearER(createNuclearERGeometry({ detail })), envelope = group.getObjectByName("PerforatedDoubleNuclearMembrane"), nuclearMaterial = envelope.material, erMaterial = continuousMembrane("#7198a7", { roughness: 0.57, clearcoat: 0.045 }), neckMaterial = continuousMembrane("#96b6c1", { roughness: 0.60, clearcoat: 0.035 }), smoothERMaterial = continuousMembrane("#95b8b0", { roughness: 0.59, clearcoat: 0.04 });
   envelope.geometry.dispose();
   envelope.geometry = continuum.geometry;
   envelope.material = [nuclearMaterial, erMaterial, neckMaterial, smoothERMaterial];
@@ -380,11 +404,16 @@ function buildNuclearER(group, detail, ctx, id) {
   }
   Object.assign(ctx.anchors, continuum.anchors);
   // Aim at exposed rough ER, not through the near nuclear envelope.
-  ctx.anchors.roughER = V(1.662932, .081858, .299937);
+  ctx.anchors.roughER = V(1.662932, .081858, .2816435432);
   ctx.anchors.roughERTarget = ctx.anchors.roughER.clone();
   ctx.anchors.roughERCamera = ctx.anchors.roughER.clone().add(V(.21, .63, 2.03));
   ctx.anchors.inside.copy(continuum.anchors.pnsInterior);
   ctx.anchors.insideTarget.copy(continuum.anchors.pnsSightTarget);
+  // Observe a real longitudinal cut through the shared neck from outside.
+  // A camera physically inside the narrow PNS only sees an uninformative wall.
+  const lumenDirection = V(-0.55, 0.2, 1).normalize();
+  ctx.anchors.lumenTarget = continuum.anchors.connection.clone();
+  ctx.anchors.lumenCamera = ctx.anchors.lumenTarget.clone().addScaledVector(lumenDirection, 1.45);
   ctx.metadata = continuum.metadata;
   ctx.metadata.secretoryDetails = erDetailDescriptors(true);
   ctx.stats = { ...ctx.stats, continuousNuclearER: true, smoothERTubularDomain: true, smoothERSharedPort: true, sharedNuclearPorts: 1, sharedIntercisternalNecks: 20, erCisternae: 11, continuumTriangles: continuum.geometry.index.count / 3 };
@@ -394,6 +423,44 @@ function buildNuclearER(group, detail, ctx, id) {
     ctx.anchors.focus.copy(continuum.anchors.connection);
     ctx.sectionNormal = V(-0.55, 0.2, 1).normalize().negate();
     ctx.sectionFocus = continuum.anchors.connection.clone();
+    const lumenView = { value: 0 }, lumenColor = { value: new THREE.Color('#e1cda0') };
+    for (const material of envelope.material) {
+      const compile = material.onBeforeCompile;
+      material.onBeforeCompile = function(shader, renderer) {
+        compile.call(this, shader, renderer);
+        shader.uniforms.erLumenView = lumenView;
+        shader.uniforms.erLumenColor = lumenColor;
+        shader.fragmentShader = 'uniform float erLumenView;\nuniform vec3 erLumenColor;\n' + shader.fragmentShader;
+        shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>',
+          '#include <color_fragment>\nif (!gl_FrontFacing) diffuseColor.rgb = mix(diffuseColor.rgb, erLumenColor, erLumenView);');
+      };
+      material.customProgramCacheKey = () => 'continuous-er-lumen-face-v1';
+    }
+    // These line segments are the actual membrane/section-plane intersection,
+    // not another membrane or a fabricated tube in the water-filled lumen.
+    const edgePlane = new THREE.Plane(ctx.sectionNormal, -ctx.sectionNormal.dot(ctx.sectionFocus));
+    const edges = [], vertices = continuum.geometry.attributes.position, index = continuum.geometry.index;
+    const a = V(), b = V(), c = V();
+    for (let i = 0; i < index.count; i += 3) {
+      const triangle = [a.fromBufferAttribute(vertices, index.getX(i)), b.fromBufferAttribute(vertices, index.getX(i + 1)), c.fromBufferAttribute(vertices, index.getX(i + 2))];
+      const hits = [];
+      for (let e = 0; e < 3; e++) {
+        const p = triangle[e], q = triangle[(e + 1) % 3], dp = edgePlane.distanceToPoint(p), dq = edgePlane.distanceToPoint(q);
+        if ((dp < 0) !== (dq < 0)) hits.push(p.clone().lerp(q, dp / (dp - dq)));
+      }
+      if (hits.length === 2 && hits.some(p => p.distanceTo(ctx.sectionFocus) < .8)) for (const p of hits) edges.push(...p.toArray());
+    }
+    const edgeGeometry = new THREE.BufferGeometry();
+    edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edges, 3));
+    const cutEdges = new THREE.LineSegments(edgeGeometry, new THREE.LineBasicMaterial({ color: '#73614c', transparent: true, opacity: .65, depthWrite: false }));
+    cutEdges.name = 'ActualERMembraneSectionIntersections';
+    cutEdges.userData = { teachingOverlay: true, contourFromActualTriangles: true, excludeFromAO: true };
+    cutEdges.visible = false;group.add(cutEdges);
+    let focusedLumen = false, currentSection = 0;
+    ctx.onObservationFocus = key => { focusedLumen = key === 'er-lumen';lumenView.value = Number(focusedLumen);cutEdges.visible = focusedLumen && Math.abs(currentSection - .78) < .002; };
+    ctx.onSection = amount => { currentSection = amount;cutEdges.visible = focusedLumen && Math.abs(amount - .78) < .002; };
+    ctx.onDispose = () => { edgeGeometry.dispose();cutEdges.material.dispose(); };
+    ctx.metadata.lumenInspection = { sameContinuousGeometry: true, sectionThroughSharedNeck: true, interiorFaceColor: 'Warm ochre is an observation color for the lumen-facing side, not measured tissue color', contourFromActualTriangles: true };
     ctx.facts = ["核外膜经接头与内质网膜连续，核周隙通向内质网腔。", "核孔连接核质与胞质，与核周隙—内质网腔属于不同通路。", "紫色为核膜，蓝色为ER膜与连接颈。剖切后可观察内外核膜、核周隙及进入ER腔的连续关系。"];
     const geometry = continuum.geometry, indices = geometry.index.array, position = geometry.attributes.position, normals = geometry.attributes.normal, candidates = [];
     for (const section of geometry.groups) if (section.materialIndex === 1) for (let face = section.start; face < section.start + section.count; face += 3) candidates.push(face);
@@ -524,7 +591,7 @@ function applyBakedERPlacement(detail, ribosomes, anchors, input) {
   return { ...entry.stats };
 }
 function buildER(group, detail, ctx) {
-  const map = relief(8), material = continuousMembrane("#8babb4", { roughness: 0.43, clearcoat: 0.24 }), folded = foldedReticulum(detail, material);
+  const map = relief(8), material = continuousMembrane("#8babb4", { roughness: 0.57, clearcoat: 0.045 }), folded = foldedReticulum(detail, material);
   group.add(folded.mesh);
   ctx.shell.push(folded.mesh);
   ctx.textures.add(map);
@@ -623,7 +690,7 @@ function buildER(group, detail, ctx) {
   const originalERGeometry = folded.mesh.geometry;
   const smoothER = attachSmoothERNetwork({ geometry: originalERGeometry, capCenterId: originalERGeometry.attributes.position.count - 1, scale: 0.8, materialIndex: 1 });
   folded.mesh.geometry = smoothER.geometry;
-  folded.mesh.material = [material, continuousMembrane("#95b8b0", { roughness: 0.49, clearcoat: 0.2 })];
+  folded.mesh.material = [material, continuousMembrane("#95b8b0", { roughness: 0.59, clearcoat: 0.04 })];
   folded.mesh.userData.secretoryDomainByMaterial = { 0: "rough-er", 1: "smooth-er" };
   originalERGeometry.dispose();
   ctx.anchors.smoothER = V().fromArray(smoothER.metadata.smoothAnchor);
@@ -639,7 +706,7 @@ function erDetailDescriptors(connected) {
   return [
     { id: "rough-er", title: "粗面内质网 · RER", anchor: "roughER", camera: "roughERCamera", target: "roughERTarget", section: 0, guideFeatureId: "rough-er" },
     { id: "smooth-er", title: "光面内质网 · SER", anchor: "smoothER", camera: "smoothERCamera", target: "smoothERTarget", section: 0, guideFeatureId: "smooth-er" },
-    { id: "er-lumen", title: connected ? "核周隙—ER 连续腔" : "进入 ER 水性腔", camera: "inside", target: "insideTarget", section: .73, inside: true, guideFeatureId: connected ? "nuclear-er-connection" : "er-lumen" }
+    { id: "er-lumen", title: connected ? "核周隙—ER 连续腔" : "进入 ER 水性腔", camera: connected ? "lumenCamera" : "inside", target: connected ? "lumenTarget" : "insideTarget", section: connected ? .78 : 0, inside: true, micro: !connected, description: connected ? "斜切开同一套膜结构：紫色为核膜、蓝色为内质网膜；暖色标示朝向水性腔的一面。沿开放的连接颈可追踪核周隙与 ER 腔的连续关系。细线是实际切口边缘，不是额外的膜。" : undefined, guideFeatureId: connected ? "nuclear-er-connection" : "er-lumen" }
   ];
 }
 function buildGolgi(group, detail, ctx) {
@@ -649,7 +716,7 @@ function buildGolgi(group, detail, ctx) {
     const level = -.73 + k * .205, width = 1.18 - Math.abs(k - 3) * .055, depth = .69 + .04 * Math.sin(k), phase = k * .81, zone = zoneNames[k];
     const g = cisterna(width, depth, detail ? .033 : .042, level, phase, detail);
     const color = palettes[zone === "cis" ? 0 : zone === "medial" ? 1 : 2];
-    const m = new THREE.Mesh(g, continuousMembrane(color, { roughness: .43, clearcoat: .25 }));
+    const m = new THREE.Mesh(g, continuousMembrane(color, { roughness: .59, clearcoat: .04 }));
     m.name = `GolgiClosedFlattenedCisterna${k + 1}`;
     m.rotation.y = (k - 3) * 0.025;
     m.userData.shell = true;
@@ -673,14 +740,14 @@ function buildGolgi(group, detail, ctx) {
     }
   }
   const network = createTransGolgiNetwork({ detail });
-  const tgn = new THREE.Mesh(network.geometry, continuousMembrane("#ce837d", { roughness: .44, clearcoat: .24 }));
+  const tgn = new THREE.Mesh(network.geometry, continuousMembrane("#ce837d", { roughness: .60, clearcoat: .035 }));
   tgn.name = "GolgiTransTubulocisternalNetwork";
   tgn.userData = { shell: true, secretoryDomain: "tgn", continuousLumen: true };
   group.add(tgn);
   ctx.shell.push(tgn);
   for (let i = 0; i < (detail ? 28 : 12); i++) {
     const k = i % stack, a = i * 2.399 + 0.13, pos = V(Math.cos(a) * (1.18 + random() * 0.32), -0.75 + k * 0.21 + random() * 0.08, Math.sin(a) * (0.77 + random() * 0.24)), r = 0.07 + random() * 0.07;
-    const m = sphere(group, organicSphere(r, detail ? 24 : 12, 0.035, i), physical(i % 2 ? "#dfa2a0" : "#efb5a7", { roughness: 0.31 }), pos);
+    const m = sphere(group, organicSphere(r, detail ? 24 : 12, 0.035, i), physical(i % 2 ? "#dfa2a0" : "#efb5a7", { roughness: 0.58, clearcoat: 0.035 }), pos);
     m.name="GolgiTransportVesicleMembrane";
     m.userData.shell = true;
     m.userData.secretoryDomain = "carriers";
@@ -771,10 +838,12 @@ function buildMito(group, detail, ctx) {
           mat.map = albedo;
           mat.bumpMap = grain;
           mat.bumpScale = 18e-4;
-          mat.roughnessMap = grain;
-          mat.roughness = 0.43;
-          mat.metalness = 5e-3;
-          mat.envMapIntensity = 0.7;
+          mat.roughnessMap = restrainedRoughness(grain);
+          mat.roughness = o.name.includes("ClosedOuter") ? 0.60 : 0.57;
+          mat.metalness = 0;
+          mat.envMapIntensity = 0.58;
+          mat.userData.atlasMaterialRole = "membrane";
+          mat.userData.tissueSurfaceResponse = { version: 1, treatment: "opaque diffuse mitochondrial membranes", linearRoughnessMapRange: [.86, 1], illustrativeOnly: true };
           mat.color.set(o.name.includes("ClosedOuter") ? "#bf6d3f" : mat === mats[0] ? "#d88a52" : "#e49a61");
           mat.emissiveIntensity = 0.012;
           mat.needsUpdate = true;
@@ -968,94 +1037,11 @@ function fragmentInstances(parent, points, radius, material, random, detail = tr
   parent.add(object);
   return object;
 }
-function buildVesicle(group, detail, ctx, id) {
-  const palette = { lysosome: "#997ba9", endosome: "#91adb3", phagosome: "#bd996c", peroxisome: "#91a285" }, shell = membraneSurface(group, palette[id], detail, { radius: 1.08, seed: id.length, continuous: id === "lysosome" || id === "endosome" });
-  ctx.shell.push(shell.outer, shell.inner);
-  ctx.textures.add(shell.map);
-  const random = rng(id.length * 181);
-  const sparse = pointsInBall(detail ? 110 : 35, random, 0.87);
-  beads(group, sparse, detail ? 0.01 : 0.022, physical(id === "lysosome" ? "#b691a1" : id === "peroxisome" ? "#a0ac8d" : "#c7b284", { roughness: 0.62, bumpScale: 1e-3 }), { segments: detail ? 24 : 6, name: "FineSolubleLumenGranules" });
-  if (id === "endosome") {
-    const cargoMaterial = physical("#b796a6", { roughness: 0.58, bumpScale: 1e-3 }), packingRandom = rng(detail ? 8723 : 8724), lumenQueries = erPlacementQueries(shell.inner.geometry), packed = [];
-    let relocatedVesicles = 0, rejectionAttempts = 0, minimumEnvelopeGap = Infinity, minimumLimitingMembraneGap = Infinity;
-    for (let i = 0; i < (detail ? 22 : 10); i++) {
-      const initialPoint = pointsInBall(1, random, 0.72)[0], radius = 0.1 + random() * 0.12, outerGeometry = organicSphere(radius, detail ? 40 : 16, 0.018, i), vertexPositions = outerGeometry.attributes.position;
-      let envelopeRadius = 0;
-      for (let vertex = 0; vertex < vertexPositions.count; vertex++) envelopeRadius = Math.max(envelopeRadius, V().fromBufferAttribute(vertexPositions, vertex).length());
-      let point = initialPoint.clone(), accepted = false;
-      for (let attempt = 0; attempt < 12e3; attempt++) {
-        if (attempt > 0) {
-          point = pointsInBall(1, packingRandom, 0.78)[0];
-          rejectionAttempts++;
-        }
-        if (packed.some((other) => point.distanceTo(other.point) < envelopeRadius + other.radius + 0.012)) continue;
-        if (lumenQueries.nearest(point) < envelopeRadius + 0.012 || lumenQueries.outside(point)) continue;
-        accepted = true;
-        break;
-      }
-      if (!accepted) throw new Error("No nonintersecting endosomal lumen position for ILV " + i);
-      relocatedVesicles += Number(point.distanceToSquared(initialPoint) > 1e-12);
-      for (const other of packed) minimumEnvelopeGap = Math.min(minimumEnvelopeGap, point.distanceTo(other.point) - envelopeRadius - other.radius);
-      minimumLimitingMembraneGap = Math.min(minimumLimitingMembraneGap, lumenQueries.nearest(point) - envelopeRadius);
-      packed.push({ point: point.clone(), radius: envelopeRadius });
-      const membraneMaterial = continuousMembrane(i % 2 ? "#c4b4be" : "#9eb5b9", { roughness: 0.42, clearcoat: 0.24 }), outer = sphere(group, outerGeometry, membraneMaterial, point, V(1, 1, 1), "EndosomalIntralumenalVesicleMembrane"), inner = sphere(group, organicSphere(radius - 0.012, detail ? 36 : 14, 0.018, i), membraneMaterial, point, V(1, 1, 1), "IntralumenalVesicleInnerFace");
-      outer.userData.shell = inner.userData.shell = true;
-      ctx.shell.push(outer, inner);
-      if (detail && i % 2 === 0) {
-        const domains = pointsInBall(5, random, radius * 0.55).map((q) => q.add(point));
-        beads(group, domains, 0.014, cargoMaterial, { segments: 12, name: "IntralumenalVesicleCargo" });
-      }
-    }
-    ctx.stats.intralumenalVesicles = detail ? 22 : 10;
-    ctx.stats.intralumenalPacking = { relocatedVesicles, rejectionAttempts, minimumEnvelopeGap, minimumLimitingMembraneGap, envelopeBasis: "Maximum actual outer-membrane vertex radius; raw limiting membrane closest triangles" };
-  }
-  if (id === "lysosome") {
-    const enzymeColors = ["#8b709e", "#b98391", "#c9a063", "#8eaa94"];
-    for (let i = 0; i < (detail ? 26 : 11); i++) {
-      const point = pointsInBall(1, random, 0.78)[0], mesh = sphere(group, proteinShape(0.065 + random() * 0.055, detail, i), physical(enzymeColors[i % 4], { roughness: 0.51, bumpScale: 23e-4 }), point, V(1.35, 0.8, 1), "LysosomalLobedHydrolase");
-      ctx.moving.push({ object: mesh, base: point.clone(), amplitude: 0.014, speed: 0.22 + i * 7e-3 });
-    }
-    const fragments = pointsInBall(detail ? 105 : 28, random, 0.76);
-    fragmentInstances(group, fragments, detail ? 0.065 : 0.079, physical("#b69b7d", { roughness: 0.76, clearcoat: 0.08 }), random, detail);
-    ctx.stats.contentIdentity = "Lobed soluble enzymes and irregular partly digested fragments";
-  }
-  if (id === "phagosome") {
-    const cargo = new THREE.Group();
-    cargo.position.set(0.02, -0.08, -0.06);
-    group.add(cargo);
-    const cargoTexture = microTexture("cargo", 1.25), cargoAlbedo = cargoTexture.clone();
-    cargoAlbedo.colorSpace = THREE.SRGBColorSpace;
-    cargoAlbedo.needsUpdate = true;
-    const cargoMaterial = physical("#beaa8d", { roughness: 0.83, clearcoat: 0.06, map: cargoAlbedo, bumpMap: cargoTexture, bumpScale: 0.032 }), core = sphere(cargo, organicSphere(0.52, detail ? 96 : 32, 0.19, 12), cargoMaterial, V(), V(1, 0.76, 0.88), "IrregularEngulfedCargoCore");
-    const surface = [];
-    for (let i = 0; i < (detail ? 440 : 90); i++) {
-      const a = random() * TAU, b = Math.acos(random() * 2 - 1), r = 0.47 + random() * 0.12;
-      surface.push(V(Math.sin(b) * Math.cos(a) * r, Math.cos(b) * r * 0.77, Math.sin(b) * Math.sin(a) * r * 0.89));
-    }
-    fragmentInstances(cargo, surface, detail ? 0.054 : 0.072, cargoMaterial, random, detail);
-    const loose = pointsInBall(detail ? 55 : 18, random, 0.84).filter((q) => q.length() > 0.62);
-    fragmentInstances(group, loose, 0.057, cargoMaterial, random, detail);
-    ctx.stats.contentIdentity = "Rough engulfed core, layered surface flakes and loose surrounding debris";
-  }
-  if (id === "peroxisome") {
-    const enzymeMatrix = physical("#a3af89", { roughness: 0.58, bumpScale: 15e-4 }), corePoints = pointsInBall(detail ? 700 : 100, random, 0.6).map((q) => q.multiply(V(0.86, 1, 0.86)).add(V(0.04, -0.03, -0.04)));
-    beads(group, corePoints, detail ? 0.025 : 0.038, enzymeMatrix, { segments: detail ? 24 : 7, scales: corePoints.map(() => V(0.7 + random() * 0.5, 0.8 + random() * 0.6, 0.7 + random() * 0.5)), name: "DensePeroxisomalEnzymeMatrix" });
-    for (let i = 0; i < (detail ? 12 : 4); i++) {
-      const point = pointsInBall(1, random, 0.72)[0];
-      sphere(group, proteinShape(0.065, detail, i), physical("#b4ba94", { roughness: 0.55, bumpScale: 15e-4 }), point, V(0.8, 1.2, 0.9), "PeroxisomalOxidativeEnzymeDomain");
-    }
-    ctx.stats.contentIdentity = "Dense granular enzyme matrix without universal crystalline core";
-  }
-  ctx.radius = 1.2;
-  ctx.anchors.inside = id === "phagosome" ? V(0.5, 0.3, 0.72) : V(0.12, 0.06, 0.7);
-  ctx.anchors.insideTarget = V(0, -0.1, -0.35);
-  ctx.facts = id === "lysosome" ? ["溶酶体由单层膜包围，酸性腔内含多种水解酶。", "腔内有多种水解酶与不同阶段的降解材料。", "材料在酸性腔内逐步分解，产物可回收进入细胞代谢。"] : id === "endosome" ? ["内体是内吞货物分选与成熟的膜性区室。", "内部展示有薄膜围成的腔内小囊泡及其内容物，表现多囊泡内体特征。", "内体与溶酶体属于不同区室，不能仅凭球形外观互换名称。"] : id === "phagosome" ? ["吞噬体将被摄取的颗粒封闭在单层膜腔室中。", "成熟过程中与内体、溶酶体系统交换物质，并逐步酸化。", "内容物由粗糙核心、层状碎片和游离碎屑组成，可从不同方向观察包裹关系。"] : ["过氧化物酶体由单层膜包围，内含氧化代谢相关酶。", "内部是密集的颗粒状酶基质，分布与水解酶丰富的溶酶体有所区别。", "基质以酶性颗粒表示，结晶核心并非所有细胞类型共有。"];
-}
 function buildMembrane(group, detail, ctx) {
   return buildPlasmaMembraneDetail(group, detail, ctx);
 }
 function buildCytoskeleton(group, detail, ctx) {
-  const wall = physical("#d6b26e", { roughness: 0.4 }), head = physical("#9b87b2", { roughness: 0.45 }), points = [], scales = [];
+  const wall = physical("#d6b26e", { roughness: 0.56 }), head = physical("#9b87b2", { roughness: 0.59 }), points = [], scales = [];
   const n = detail ? 70 : 28;
   for (let j = 0; j < n; j++) for (let proto = 0; proto < 13; proto++) {
     const a = proto / 13 * TAU, x = (j / (n - 1) - 0.5) * 3.2, y = Math.cos(a) * 0.23, z = Math.sin(a) * 0.23;
@@ -1070,9 +1056,9 @@ function buildCytoskeleton(group, detail, ctx) {
     const p = V(x, 0.31, 0.12);
     sphere(group, organicSphere(0.1, 20, 0.05, k), head, p, V(1, 0.68, 1), "MotorProteinHead");
     tube(group, [p, V(x + 0.08, 0.5, 0.12), V(x + 0.22, 0.7, 0.1)], 0.026, head, { segments: 30, sides: 8, name: "MotorProteinStalk" });
-    sphere(group, organicSphere(0.15, 22, 0.035, k), physical("#b4bec1", { roughness: 0.32 }), V(x + 0.22, 0.84, 0.1), V(1, 0.85, 1), "TransportCargoVesicle");
+    sphere(group, organicSphere(0.15, 22, 0.035, k), physical("#b4bec1", { roughness: 0.59, clearcoat: 0.035 }), V(x + 0.22, 0.84, 0.1), V(1, 0.85, 1), "TransportCargoVesicle");
   }
-  const actin = physical("#b4c4bd", { roughness: 0.43 });
+  const actin = physical("#b4c4bd", { roughness: 0.58 });
   for (let j = 0; j < (detail ? 96 : 36); j++) {
     const x = (j / (detail ? 95 : 35) - 0.5) * 3.3, a = j * 0.65;
     sphere(group, new THREE.SphereGeometry(detail ? 0.045 : 0.058, 8, 6), actin, V(x, -0.65 + Math.cos(a) * 0.07, Math.sin(a) * 0.07), V(1, 1, 1), "ActinHelicalMonomer");
@@ -1137,7 +1123,10 @@ function createOrganelle(id, { detail = true, connectedER = false, rebuildERPlac
     else if (id === "er") buildER(group, detail, ctx);
     else if (id === "golgi") buildGolgi(group, detail, ctx);
     else if (id === "mitochondria") buildMito(group, detail, ctx);
-    else if (["lysosome", "endosome", "phagosome", "peroxisome"].includes(id)) buildVesicle(group, detail, ctx, id);
+    else if (id === "lysosome") buildUltrastructureLysosome(group, detail, ctx);
+    else if (id === "endosome") buildUltrastructureSortingEndosome(group, detail, ctx);
+    else if (id === "phagosome") buildUltrastructurePhagosome(group, detail, ctx);
+    else if (id === "peroxisome") buildPeroxisome(group, detail, ctx, { physical, continuousMembrane, proteinShape, sphere, beads });
     else if (id === "membrane") buildMembrane(group, detail, ctx);
     else if (id === "cytoskeleton") buildCytoskeleton(group, detail, ctx);
     else if (id === "ribosome") buildRibosome(group, detail, ctx);
@@ -1174,6 +1163,17 @@ function createOrganelle(id, { detail = true, connectedER = false, rebuildERPlac
         }
       }
       o.instanceMatrix.needsUpdate = true;
+    });
+  }
+  if (detail) {
+    const finished = new Set();
+    group.traverse(object => {
+      if (!object.isMesh) return;
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (!material.userData.continuousSurfaceV1 || finished.has(material)) continue;
+        finished.add(material);
+        applyWholeOrganelleFinish(material, { contrast: .19, relief: .0055, roughnessVariation: .11, scale: 11.4, maxSlope: .22, seed: 2.3 });
+      }
     });
   }
   const shellMaterials = new Set(ctx.explicitShellMaterials);
@@ -1258,7 +1258,7 @@ function createOrganelle(id, { detail = true, connectedER = false, rebuildERPlac
   }
   ctx.stats.shellMaterials = shellMaterials.size;
   ctx.stats.modelIdentity = "Procedural teaching anatomy, not measured EM or atomic reconstruction";
-  return { group, anchors: ctx.anchors, radius: ctx.radius, setSection, update, dispose, facts: ctx.facts, stats: ctx.stats, metadata: ctx.metadata ?? null, ...ctx.erPlacementBake ? { erPlacementBake: ctx.erPlacementBake } : {}, ...ctx.mitoPlacementBake ? { mitoPlacementBake: ctx.mitoPlacementBake } : {} };
+  return { group, anchors: ctx.anchors, radius: ctx.radius, setSection, setObservationFocus: key => ctx.onObservationFocus?.(key), update, dispose, facts: ctx.facts, stats: ctx.stats, metadata: ctx.metadata ?? null, ...ctx.erPlacementBake ? { erPlacementBake: ctx.erPlacementBake } : {}, ...ctx.mitoPlacementBake ? { mitoPlacementBake: ctx.mitoPlacementBake } : {} };
 }
 export {
   ORGANELLE_IDS,

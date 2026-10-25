@@ -1,7 +1,7 @@
 // Explicit, reversible observation controls. Semantic visibility choices remain owned by the user.
 export function createExplorationControls({THREE,state,whole,network,camera,controls,visibility,isNavigating,animatePose,requestRender,syncUI,switchScenario,uptakeControls,viral,reactionFocus}){
  const $=id=>document.getElementById(id);let savedViral=null,disposed=false;
- state.userClearView=false;state.skeletonFocus=null;state.showSkeletonNetwork=false;
+ state.userClearView=false;state.skeletonFocus=null;state.showSkeletonNetwork=true;
  const assist=document.createElement('button');assist.id='clear-observation-button';assist.type='button';assist.className='micro-button';assist.setAttribute('aria-pressed','false');assist.textContent='清晰观察：关';
  $('follow-button').insertAdjacentElement('afterend',assist);
  assist.addEventListener('click',()=>{state.userClearView=!state.userClearView;syncUI();requestRender();});
@@ -12,11 +12,12 @@ export function createExplorationControls({THREE,state,whole,network,camera,cont
  const fit=(center,radius,dir=new THREE.Vector3(.15,.12,1))=>{const distance=radius/Math.sin(THREE.MathUtils.degToRad(camera.fov/2))*.96;return {position:center.clone().addScaledVector(dir.normalize(),distance),target:center,near:Math.max(.0005,Math.min(.02,distance*.003)),far:110,minDistance:.03,maxDistance:65};};
  function focusSkeleton(key){
    if(disposed)return false;
-   if(state.view!=='whole'||isNavigating()||!visibility.canShowLabel('cytoskeleton')||!visibility.canShowLabel(key==='mtoc'?'microtubules':key))return false;
+   if(state.view!=='whole'||isNavigating()||!visibility.canShowLabel('cytoskeleton')||key!=='network'&&!visibility.canShowLabel(key==='mtoc'?'microtubules':key))return false;
    if(state.scenario!=='structure')switchScenario('structure');
-   reactionFocus.leave('skeleton-view');state.skeletonFocus=key;state.showSkeletonNetwork=true;network.group.visible=true;
+   reactionFocus.leave('skeleton-view');state.skeletonFocus=key;state.userClearView=true;state.showSkeletonNetwork=true;network.group.visible=true;
    let target,radius;
-   if(key==='mtoc'||key==='microtubules'){target=whole.group.localToWorld(network.anchors.mtoc.clone());radius=key==='mtoc'?.62:1.1;}
+    if(key==='network'){target=whole.group.localToWorld(new THREE.Vector3(0,0,0));radius=7.4;}
+   else if(key==='mtoc'||key==='microtubules'){target=whole.group.localToWorld(network.anchors.mtoc.clone());radius=key==='mtoc'?.62:2.8;}
    else if(key==='intermediate-filaments'){target=whole.group.localToWorld(network.anchors.nuclearSupport.clone());radius=2.6;}
    else{
      const desired=whole.group.localToWorld(network.anchors.corticalUptake.clone());let best=Infinity;
@@ -37,21 +38,21 @@ export function createExplorationControls({THREE,state,whole,network,camera,cont
  });
  back.addEventListener('click',()=>{
    if(!savedViral||isNavigating())return;const previous=savedViral;savedViral=null;
-   switchScenario('virus');state.progress=previous.progress;state.time=previous.time;state.section=previous.section;state.playing=false;viral.seek(previous.progress);viral.resetTime(previous.motion);whole.setSection(state.section);
+   state.viralLesson='response';switchScenario('virus');state.progress=previous.progress;state.time=previous.time;state.section=previous.section;state.playing=false;viral.seek(previous.progress);viral.resetTime(previous.motion);whole.setSection(state.section);
    if(previous.focused)reactionFocus.focus();syncUI();requestRender();
  });
  function sync(){
    if(disposed)return;
-   assist.hidden=state.view!=='whole'||(!state.viralFocused&&!state.skeletonFocus);assist.disabled=isNavigating();
+   assist.hidden=state.view!=='whole'||state.scenario==='virus'&&state.viralLesson==='entry'||(!state.viralFocused&&!state.skeletonFocus);assist.disabled=isNavigating();
    assist.textContent='清晰观察：'+(state.userClearView?'开':'关');assist.setAttribute('aria-pressed',String(state.userClearView));assist.title='只在当前近景暂略前景或背景；不修改你的分组隐藏选择。';
    panel.hidden=state.view!=='whole'||state.uptakeLocal;
    $('skeleton-network-visible').checked=state.showSkeletonNetwork;$('skeleton-network-visible').disabled=isNavigating();
    for(const b of panel.querySelectorAll('[data-skeleton-focus]'))b.disabled=isNavigating()||!visibility.canShowLabel(b.dataset.skeletonFocus);
    $('skeleton-mtoc-button').disabled=isNavigating()||!visibility.canShowLabel('microtubules');
-   bridge.hidden=state.view!=='whole'||state.scenario!=='virus'||state.progress>=.16;bridge.disabled=isNavigating();
+   bridge.hidden=state.view!=='whole'||state.scenario!=='virus'||state.viralLesson==='entry'||state.progress>=.16;bridge.disabled=isNavigating();
    back.hidden=state.view!=='whole'||state.scenario!=='clearance'||state.uptakeCase!=='viral-antigen-clearance'||!savedViral;back.disabled=isNavigating();
    if(state.skeletonFocus&&state.view==='whole'){
-     $('subtitle').textContent=({'microtubules':'微管网络','actin':'膜下肌动蛋白','intermediate-filaments':'核周中间丝 · 支撑示意','mtoc':'微管组织中心 · 教学结构'})[state.skeletonFocus];
+     $('subtitle').textContent=({'network':'同一细胞中的三类骨架 · 金：微管 / 蓝：F-actin / 紫：中间丝','microtubules':'微管网络','actin':'膜下肌动蛋白','intermediate-filaments':'核周中间丝 · 支撑示意','mtoc':'微管组织中心 · 教学结构'})[state.skeletonFocus];
      $('view-hint').textContent='拖动/滚轮接管 · 清晰观察由你开关 · 重置返回整胞';
    }
  }

@@ -7,7 +7,7 @@ export function createCytoplasmMotion({THREE,whole,membraneQueries}={}){
  const originalMatrices=mesh.instanceMatrix.array.slice(),originalColors=mesh.instanceColor?.array.slice(),originalUserData=mesh.userData,oldOwnership=whole.group.userData.sharedCytoplasmMotion;
  const maxDisplacement=.20;let time=0,disposed=false,quality='high',updates=0,flowEnabled=true;
  mesh.geometry.computeBoundingSphere();const radius=mesh.geometry.boundingSphere.radius+mesh.geometry.boundingSphere.center.length();
- const A=V(4.03,.02,1.3),B=V(6.48,.30,1.3),D=V(3.15,2.18,.88),segment=new THREE.Line3(A,B),dockSegment=new THREE.Line3(D,A),closest=V(),golgi=whole.organelleLocations.get('golgi');
+ const A=V(4.03,.02,1.3),B=V(6.48,.30,1.3),D=whole.components.lysosomes[0].base.clone(),segment=new THREE.Line3(A,B),dockSegment=new THREE.Line3(D,A),closest=V(),golgi=whole.organelleLocations.get('golgi');
  for(let i=0;i<originalCount;i++){
   mesh.getMatrixAt(i,matrix);matrix.decompose(point,rotation,scale);const bound=radius*Math.max(scale.x,scale.y,scale.z)+maxDisplacement+.02;
   if(!whole.plasmaMembrane.containsPoint(point)||whole.membraneSurface.closestPoint(point,{maxDistance:bound})){rejected.cell++;continue;}
