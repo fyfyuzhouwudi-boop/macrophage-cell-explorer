@@ -1,4 +1,5 @@
 /** Expanded teaching anatomy and mechanics; spatial and temporal scales differ. */
+import { addKinesinHeadDomains } from './protein-surface-detail.js';
 export function buildTransportLesson(g,ctx){
  const {THREE,V,clamp,ease,material,mesh,ball,rod,connect,tube,cavity,chain,label,focus,getProgress}=ctx;
  const amber=0xc18d46,blue=0x789eaa,purple=0x82678f;
@@ -47,7 +48,7 @@ export function buildTransportLesson(g,ctx){
  const tmp=new THREE.Object3D();for(let j=0;j<13;j++)for(let i=0;i<50;i++){const angle=j/13*Math.PI*2;tmp.position.set(-3.8+i*.155,-1.2+Math.cos(angle)*.22,Math.sin(angle)*.22);tmp.scale.set(1,.83,.83);tmp.updateMatrix();instances[i%2].setMatrixAt(j*25+Math.floor(i/2),tmp.matrix);}instances.forEach(o=>o.instanceMatrix.needsUpdate=true);
  const motor=new THREE.Group();motor.name='ATPDrivenKinesinTeachingMotor';g.add(motor);
  const headMat=material(purple),headAMat=material(0x806092),headBMat=material(0x9b7ba3);
- function motorHead(name,mat){const head=new THREE.Group();head.name=name;motor.add(head);ball(head,name+'MotorDomain',.115,mat,V(),V(1.15,.78,.8));ball(head,name+'NucleotidePocket',.041,material(0x5c486d),V(.045,.068,.045),V(1,.55,1));rod(head,name+'MicrotubuleBindingFace',V(-.06,-.08,.005),V(.075,-.08,.005),.022,mat);return head;}
+ function motorHead(name,mat){const head=new THREE.Group();head.name=name;motor.add(head);addKinesinHeadDomains(head,name,mat,material(0x5c486d));return head;}
  const headA=motorHead('KinesinHeadA',headAMat),headB=motorHead('KinesinHeadB',headBMat);
  function flexibleLinker(name){const segments=[];for(let i=0;i<8;i++)segments.push(rod(motor,name+i,V(0,0,0),V(0,.1,0),.024,headMat));return segments;}
  const linkerA=flexibleLinker('KinesinNeckLinkerA'),linkerB=flexibleLinker('KinesinNeckLinkerB');
@@ -98,7 +99,7 @@ export function buildTransportLesson(g,ctx){
  label('mitochondrion','线粒体：双膜与内膜嵴','橙色外膜、浅色内膜和两层切缘可分辨；嵴是内膜连续折叠，不是游离细管。',()=>mito.localToWorld(V(-.9,.25,.04)),'#ae7d55');
  label('crista-synthase','ATP 合酶朝向基质','绿色成对的催化头朝基质侧；嵴腔与膜间隙相通。这里只放大代表性构造，未按原子尺度绘制。',()=>mito.localToWorld(V(0,.52,.08)),'#628c7e',()=>step()===0);
  label('nucleotide-symbol','ATP / ADP＋Pi 化学符号','金色磷酸相连表示 ATP，末端分开提示水解产物；化学状态的节拍是教学化处理。',()=>step()===0?chemical.getWorldPosition(V()):nucleotide.getWorldPosition(V()),'#aa8037',()=>step()===0||step()===2||step()===3);
- label('motor','双头 kinesin：交替换步','深紫与浅紫区分两个头；一步中一头保持轨道位点，后头前摆越过它，随后交换角色。',()=>motor.localToWorld(V(0,-.5,.28)),'#876497',()=>step()>0);
+ label('motor','双头 kinesin：凹槽与结合面','深紫与浅紫区分两个头；头部上前侧的浅凹表示核苷酸口袋，下侧是不同的微管结合面。一步中一头保持轨道位点，后头前摆，随后交换角色。凹槽形体为粗化，未拟合原子坐标。',()=>motor.localToWorld(V(0,-.5,.28)),'#876497',()=>step()>0);
  label('microtubule','α/β 微管蛋白组成的轨道','双色重复表示 α/β 微管蛋白；13 条原纤维围成中空壁。头部沿外表面的结合位点前进。',V(2.85,-1.12,.25),'#a1894b');
  label('transport-cargo','膜接头连接马达与载体','绿色接头跨在载体膜处，胞质端连接马达；橙色货物留在膜腔内，随载体整体移动。',()=>vesicle.localToWorld(V(.1,.2,.4)),'#688e9c',()=>step()>0);
  update(0);

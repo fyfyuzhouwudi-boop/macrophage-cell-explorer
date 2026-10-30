@@ -39,13 +39,14 @@ export function createClassroomOverlay({THREE,container,camera,measure,getLesson
     line.setAttribute('fill','none');line.setAttribute('stroke-width','1.2');
     line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');
     dot.setAttribute('r','3.1');leaders.append(line,dot);
-    return {el,strong,small,line,dot};
+    return {el,strong,small,line,dot,size:{dirty:true}};
   });
   const projected=new THREE.Vector3(),cameraSpace=new THREE.Vector3();
   const clamp=(n,a,b)=>Math.min(Math.max(n,a),Math.max(a,b));
   const finite=n=>typeof n==='number'&&Number.isFinite(n);
   const text=(value,max=100)=>{const chars=Array.from(String(value??'').replace(/\s+/g,' ').trim());return chars.length>max?chars.slice(0,max-1).join('')+'…':chars.join('');};
-  const setText=(el,value,max)=>{const nextText=text(value,max);if(el.textContent!==nextText)el.textContent=nextText;el.hidden=!nextText;};
+  const setText=(el,value,max)=>{const nextText=text(value,max);if(el.textContent!==nextText)el.textContent=nextText;if(el.hidden!==!nextText)el.hidden=!nextText;};
+  const attribute=(el,key,value)=>{const next=String(value);if(el.getAttribute(key)!==next)el.setAttribute(key,next);};
   const rect=(left,top,width,height)=>({left,top,right:left+width,bottom:top+height,width,height});
   const intersects=(a,b,gap=0)=>a.left<b.right+gap&&a.right>b.left-gap&&a.top<b.bottom+gap&&a.bottom>b.top-gap;
   const inside=(r,width,height)=>r.left>=0&&r.top>=0&&r.right<=width+.5&&r.bottom<=height+.5;
@@ -54,8 +55,39 @@ export function createClassroomOverlay({THREE,container,camera,measure,getLesson
     if(typeof value==='number'||value?.isColor){try{return new THREE.Color(value).getStyle();}catch{return '#517b87';}}
     return '#517b87';
   };
-  const hideRow=row=>{row.el.hidden=true;row.line.style.display='none';row.dot.style.display='none';};
-  let current=null,stageSignature='',disposed=false,updates=0;
+  const hideRow=(row,reason='inactive')=>{if(!row.el.hidden)row.el.hidden=true;if(row.line.style.display!=='none')row.line.style.display='none';if(row.dot.style.display!=='none')row.dot.style.display='none';if(reason!=='no-space')row.size.dirty=true;};
+  let current=null,stageSignature='',disposed=false,updates=0,layoutMeasurements=0,layoutCacheHits=0,layoutEpoch=0,layoutRefresh=null;
+  const cardSize={dirty:true},view=doc.defaultView;
+  const style=(el,key,value)=>{if(el.style[key]!==value)el.style[key]=value;};
+  const invalidateLayout=()=>{if(disposed)return;layoutEpoch++;cardSize.dirty=true;rows.forEach(row=>row.size.dirty=true);};
+  // A paused WebGL scene need not render again just because a font loaded.
+  // Refresh only this DOM layout once; this does not advance the host clock.
+  const requestLayoutRefresh=()=>{if(disposed||host.hidden||layoutRefresh!==null||typeof view?.requestAnimationFrame!=='function')return;layoutRefresh=view.requestAnimationFrame(()=>{layoutRefresh=null;if(!disposed&&!host.hidden)update();});};
+  const fontChanged=()=>{invalidateLayout();requestLayoutRefresh();};
+  const cacheKey=(width,height)=>[width,height,view?.innerWidth,view?.innerHeight,view?.devicePixelRatio,layoutEpoch].join(':');
+  function measuredBox(el,cache,key,fallbackWidth,fallbackHeight){
+    if(cache.dirty||cache.key!==key){
+      if(el.hidden)el.hidden=false;
+      const width=el.offsetWidth,height=el.offsetHeight;layoutMeasurements+=2;
+      Object.assign(cache,{width:width||fallbackWidth,height:height||fallbackHeight,key,dirty:false});
+    }else layoutCacheHits++;
+    return cache;
+  }
+  const observed=new Map([[card,cardSize],...rows.map(row=>[row.el,row.size])]);
+  const ResizeObserverClass=view?.ResizeObserver;
+  const resizeObserver=typeof ResizeObserverClass==='function'?new ResizeObserverClass(entries=>{
+    for(const entry of entries){
+      const cache=observed.get(entry.target);if(!cache)continue;
+      const box=entry.borderBoxSize?.[0]??entry.borderBoxSize;
+      if(box&&box.inlineSize>0&&box.blockSize>0){
+        if(cache.width!==Math.round(box.inlineSize)||cache.height!==Math.round(box.blockSize))cache.dirty=true;
+      }else if(!entry.target.hidden)cache.dirty=true;
+      if(cache.dirty)requestLayoutRefresh();
+    }
+  }):null;
+  observed.forEach((_,el)=>resizeObserver?.observe(el));
+  doc.fonts?.addEventListener?.('loadingdone',fontChanged);doc.fonts?.addEventListener?.('loadingerror',fontChanged);
+  doc.fonts?.ready?.then(fontChanged);
   let last={active:false,labels:[],hiddenLabels:[],collisions:[],allVisibleLabelsOnCanvas:true};
   function seek(delta){
     if(!current)return;
@@ -76,12 +108,12 @@ export function createClassroomOverlay({THREE,container,camera,measure,getLesson
     const width=Number(size.width),height=Number(size.height);
     if(!lesson||!finite(width)||!finite(height)||width<1||height<1){
       current=null;host.hidden=true;rows.forEach(hideRow);
-      last={active:false,updates,labels:[],hiddenLabels:[],collisions:[],allVisibleLabelsOnCanvas:true};
+      last={active:false,updates,layoutMeasurements,layoutCacheHits,labels:[],hiddenLabels:[],collisions:[],allVisibleLabelsOnCanvas:true};
       return;
     }
-    current=lesson;host.hidden=false;
-    host.style.width=`${width}px`;host.style.height=`${height}px`;
-    leaders.setAttribute('viewBox',`0 0 ${width} ${height}`);
+    current=lesson;if(host.hidden){host.hidden=false;invalidateLayout();}
+    style(host,'width',`${width}px`);style(host,'height',`${height}px`);
+    attribute(leaders,'viewBox',`0 0 ${width} ${height}`);
     const detailed=lesson.key==='response'&&lesson.substeps?.length;
     const total=detailed?lesson.substeps.length:Math.max(1,Math.trunc(Number(lesson.total)||lesson.stages?.length||1));
     const index=clamp(Math.trunc(Number(detailed?lesson.substepIndex:lesson.index)||0),0,total-1);
@@ -101,8 +133,10 @@ export function createClassroomOverlay({THREE,container,camera,measure,getLesson
     }
     const cardLeft=width<640?16:30,cardTop=height<580?92:115;
     const cardWidth=Math.min(width<760?240:280,Math.max(180,width-32));
-    Object.assign(card.style,{left:`${cardLeft}px`,top:`${cardTop}px`,width:`${cardWidth}px`,maxHeight:`${Math.max(130,height-cardTop-120)}px`,overflow:'auto'});
-    const cardRect=rect(cardLeft,cardTop,card.offsetWidth||cardWidth,card.offsetHeight||260);
+    const maxCardHeight=Math.max(130,height-cardTop-120),layoutKey=cacheKey(width,height);
+    for(const [key,value]of Object.entries({left:`${cardLeft}px`,top:`${cardTop}px`,width:`${cardWidth}px`,maxHeight:`${maxCardHeight}px`,overflow:'auto'}))style(card,key,value);
+    const cardBox=measuredBox(card,cardSize,[layoutKey,stageSignature,cardWidth,maxCardHeight].join('|'),cardWidth,260);
+    const cardRect=rect(cardLeft,cardTop,cardBox.width,cardBox.height);
     const safe=rect(16,Math.min(112,Math.max(16,height*.17)),Math.max(1,width-32),Math.max(1,height-116-Math.min(112,Math.max(16,height*.17))));
     const entry=lesson.key==='entry';
     // Text must not sit on the protein/neck/pore merely because a leader is
@@ -116,22 +150,23 @@ export function createClassroomOverlay({THREE,container,camera,measure,getLesson
     camera.updateMatrixWorld();
     for(let i=0;i<rows.length;i++){
       const row=rows[i],label=inputs[i];
-      hideRow(row);
-      if(!label)continue;
+      if(!label){hideRow(row,'no-label');continue;}
       const id=String(label.id??`label-${i+1}`),p=label.position;
-      if(!p||![p.x,p.y,p.z].every(finite)){hidden.push({id,reason:'invalid-anchor'});continue;}
+      if(!p||![p.x,p.y,p.z].every(finite)){hideRow(row,'invalid-anchor');hidden.push({id,reason:'invalid-anchor'});continue;}
       projected.copy(p).project(camera);cameraSpace.copy(p).applyMatrix4(camera.matrixWorldInverse);
       if(cameraSpace.z>=0||projected.z< -1||projected.z>1||Math.abs(projected.x)>1||Math.abs(projected.y)>1){
-        hidden.push({id,reason:'outside-camera'});continue;
+        hideRow(row,'outside-camera');hidden.push({id,reason:'outside-camera'});continue;
       }
       const anchor={x:(projected.x*.5+.5)*width,y:(-.5*projected.y+.5)*height,z:projected.z};
       const tint=color(label.color);
       setText(row.strong,label.title,30);setText(row.small,label.action,28);
-      row.el.dataset.classroomLabel=id;row.el.style.setProperty('--label-color',tint);
-      row.el.hidden=false;
+      if(row.el.dataset.classroomLabel!==id)row.el.dataset.classroomLabel=id;
+      if(row.tint!==tint){row.tint=tint;row.el.style.setProperty('--label-color',tint);row.line.setAttribute('stroke',tint);row.dot.setAttribute('fill',tint);}
       const preferredWidth=width<760?155:180;
-      row.el.style.width=`${Math.min(preferredWidth,Math.max(115,width-cardRect.right-38))}px`;
-      const w=row.el.offsetWidth||preferredWidth,h=row.el.offsetHeight||58;
+      const labelWidth=Math.min(preferredWidth,Math.max(115,width-cardRect.right-38));
+      style(row.el,'width',`${labelWidth}px`);
+      const box=measuredBox(row.el,row.size,[layoutKey,id,row.strong.textContent,row.small.textContent,labelWidth].join('|'),preferredWidth,58);
+      const w=box.width,h=box.height;
       const minLeft=safe.left,maxLeft=Math.max(minLeft,safe.right-w),minTop=safe.top,maxTop=Math.max(minTop,safe.bottom-h);
       const candidates=[];
       const add=(left,top,preference,zone='near-anchor')=>{
@@ -174,22 +209,23 @@ export function createClassroomOverlay({THREE,container,camera,measure,getLesson
       for(let y=cardRect.bottom+18;y<=maxTop;y+=h+14)add(safe.left,y,entry?1200:180,'below-card');
       candidates.sort((a,b)=>a.score-b.score);
       const chosen=candidates[0];
-      if(!chosen){hideRow(row);hidden.push({id,reason:'no-collision-free-space'});continue;}
+      if(!chosen){hideRow(row,'no-space');hidden.push({id,reason:'no-collision-free-space'});continue;}
       const r=chosen.rect;
-      row.el.style.left=`${r.left.toFixed(2)}px`;row.el.style.top=`${r.top.toFixed(2)}px`;
+      if(row.el.hidden)row.el.hidden=false;
+      style(row.el,'left',`${r.left.toFixed(2)}px`);style(row.el,'top',`${r.top.toFixed(2)}px`);
       const edge={x:clamp(anchor.x,r.left+8,r.right-8),y:clamp(anchor.y,r.top+8,r.bottom-8)};
       if(anchor.x<r.left)edge.x=r.left;else if(anchor.x>r.right)edge.x=r.right;
       else if(anchor.y<r.top)edge.y=r.top;else edge.y=r.bottom;
       const knee={x:edge.x+(anchor.x-edge.x)*.42,y:edge.y};
-      row.line.setAttribute('d',`M ${anchor.x.toFixed(2)} ${anchor.y.toFixed(2)} L ${knee.x.toFixed(2)} ${knee.y.toFixed(2)} L ${edge.x.toFixed(2)} ${edge.y.toFixed(2)}`);
-      row.line.setAttribute('stroke',tint);row.line.style.display='';
-      row.dot.setAttribute('cx',anchor.x.toFixed(2));row.dot.setAttribute('cy',anchor.y.toFixed(2));row.dot.setAttribute('fill',tint);row.dot.style.display='';
+      attribute(row.line,'d',`M ${anchor.x.toFixed(2)} ${anchor.y.toFixed(2)} L ${knee.x.toFixed(2)} ${knee.y.toFixed(2)} L ${edge.x.toFixed(2)} ${edge.y.toFixed(2)}`);
+      style(row.line,'display','');
+      attribute(row.dot,'cx',anchor.x.toFixed(2));attribute(row.dot,'cy',anchor.y.toFixed(2));style(row.dot,'display','');
       occupied.push({id,rect:r});visible.push({id,title:row.strong.textContent,action:row.small.textContent,color:tint,anchor,rect:r,zone:chosen.zone,visible:true});
     }
     const collisions=[];
     for(let i=0;i<occupied.length;i++)for(let j=i+1;j<occupied.length;j++)if(intersects(occupied[i].rect,occupied[j].rect))collisions.push({first:occupied[i].id,second:occupied[j].id});
     const labelModelOverlaps=visible.filter(item=>modelReserve.width>0&&modelReserve.height>0&&intersects(item.rect,modelReserve)).map(item=>item.id);
-    last={active:true,updates,key:lesson.key,index,total,title:title.textContent,dimensions:{width,height},card:cardRect,safeRect:safe,modelReserve,labels:visible,hiddenLabels:hidden,omittedAboveLimit:Math.max(0,(lesson.labels?.length||0)-5),collisions,labelModelOverlaps,allVisibleLabelsOnCanvas:visible.every(item=>inside(item.rect,width,height)),cardInsideCanvas:inside(cardRect,width,height)};
+    last={active:true,updates,layoutMeasurements,layoutCacheHits,key:lesson.key,index,total,title:title.textContent,dimensions:{width,height},card:cardRect,safeRect:safe,modelReserve,labels:visible,hiddenLabels:hidden,omittedAboveLimit:Math.max(0,(lesson.labels?.length||0)-5),collisions,labelModelOverlaps,allVisibleLabelsOnCanvas:visible.every(item=>inside(item.rect,width,height)),cardInsideCanvas:inside(cardRect,width,height)};
   }
   function diagnostics(){return JSON.parse(JSON.stringify(last));}
   function dispose(){
@@ -197,6 +233,7 @@ export function createClassroomOverlay({THREE,container,camera,measure,getLesson
     disposed=true;current=null;
     prev.removeEventListener('click',previousClick);next.removeEventListener('click',nextClick);
     card.removeEventListener('pointerdown',stopPropagation);card.removeEventListener('wheel',stopPropagation);card.removeEventListener('keydown',nativeButtonKey);
+    resizeObserver?.disconnect();if(layoutRefresh!==null)view?.cancelAnimationFrame?.(layoutRefresh);doc.fonts?.removeEventListener?.('loadingdone',fontChanged);doc.fonts?.removeEventListener?.('loadingerror',fontChanged);
     host.remove();last={active:false,disposed:true,labels:[],hiddenLabels:[],collisions:[],allVisibleLabelsOnCanvas:true};
   }
   return {update,diagnostics,dispose};

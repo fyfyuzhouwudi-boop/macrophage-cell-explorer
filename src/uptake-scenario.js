@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {createContinuousPhagocyticRoute,A_ROUTE_EVENT} from './a-continuous-route.js';
+import {addCathepsinDomains} from './protein-surface-detail.js';
 
 // Independent, normalized teaching panels. No whole geometry or clock is written.
 export const UPTAKE_CASES = Object.freeze([
@@ -206,11 +207,14 @@ export function createUptakeScenario({whole=null,detail=true}={}) {
   iggDomains.userData.scope='Generic rounded IgG domain topology; Fab faces cargo, Fc faces FcγR, not an atomic structure';
   const fc=instances(glyph('fc',detail),fcMat,8,aRoot,'CupMembraneFcGammaReceptors','a-fc',['uptake-receptors','membrane-proteins','membrane'],A);
   const actin=instances(new THREE.CylinderGeometry(.019,.019,1,detail?7:5,1,false),actinMat,8*8,aRoot,'CytoplasmicCupActin','a-actin',['actin','membrane'],A);
-  const enzymes=instances(merge([
-    {geometry:ellipsoid(-.047,0,0,.048,.06,.045,detail?14:10)},
-    {geometry:ellipsoid(.047,0,.012,.047,.053,.046,detail?14:10)},
-    {geometry:tubeBetween(V(-.03,-.045,.014),V(.03,-.045,.014),.016,8)}
-  ]),enzymeMat,6,aRoot,'AlreadyLuminalProcessingEnzymes','a-enzymes',['lysosome'],A);
+  const enzymePrototype=new THREE.Group();
+  addCathepsinDomains(enzymePrototype,'UptakeHydrolase',enzymeMat,enzymeMat);
+  const enzymeGeometry=merge(enzymePrototype.children.map(o=>({geometry:o.geometry})));
+  // Same instanced actor, now with a two-lobe cleft and one occluding-loop cue.
+  // Face its substrate side inward; do not add independent molecular motion.
+  enzymeGeometry.rotateY(Math.PI);enzymeGeometry.scale(.40,.40,.40);enzymeGeometry.computeBoundingSphere();enzymePrototype.clear();
+  const enzymes=instances(enzymeGeometry,enzymeMat,6,aRoot,'AlreadyLuminalProcessingEnzymes','a-enzymes',['lysosome'],A);
+  enzymes.userData.proteinDetail='Cathepsin-B-type coarse domain/cleft/loop envelope; generic proteolysis, not an atomic catalytic trajectory';
   const clefts=instances(ellipsoid(0,0,-.025,.02,.029,.012,detail?12:8),cleftMat,6,aRoot,'HydrolaseCatalyticClefts','a-clefts',['phagosome'],A);
   const peptideNodes=instances(new THREE.SphereGeometry(.039,detail?10:7,detail?7:5),peptideMat,24,aRoot,'LuminalProteinSubstrateAndProducts','a-peptide',['phagosome','uptake-particles'],A);
   const peptideBonds=instances(new THREE.CylinderGeometry(.012,.012,1,7,1,false),peptideMat,18,aRoot,'HydrolysablePeptideBonds','a-bonds',['phagosome','uptake-particles'],A);

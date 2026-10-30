@@ -1,0 +1,41 @@
+{
+  "version": "6.2.0",
+  "releaseDate": "2026-10-30",
+  "buildDate": "2026-10-28",
+  "htmlSha256": "1665139aeae88fe31c18ea405cba68b7e382de8d20825234dea68e54bb0fc4c3",
+  "htmlBytes": 34024204,
+  "checks": {
+    "automatedTests": 17,
+    "browserInteractionChecks": 137,
+    "browserScreenshots": 50,
+    "javascriptErrorsInCheckedScenes": 0
+  },
+  "performance": {
+    "viewport": "1440x900",
+    "quality": "high",
+    "playbackSpeed": 0.5,
+    "secondsPerScene": 8,
+    "membraneProteinScriptMsPerFrame": {
+      "before": 7.529,
+      "after": 5.45
+    },
+    "uptakeEnzymeScriptMsPerFrame": {
+      "before": 6.644,
+      "after": 3.256
+    },
+    "measuredBuild": "1f3f8e92236de0ec1f6d154e5e4e8f6464b16e5051cfe2e9aed4d2c1f7d20cf9",
+    "note": "Measurements refer to the earlier 1f3f8e92 candidate, not the rebuilt 1665139a artifact."
+  },
+  "guide": {
+    "date": "2026-10-25",
+    "build": "cf673162",
+    "revisedForThisVersion": false
+  },
+  "limitations": [
+    "Selected scenes on one computer; not a frame-rate guarantee.",
+    "Teaching protein envelopes rather than atomic-coordinate reconstruction.",
+    "The 2026-10-25 guide screenshots predate this build."
+  ],
+  "portableZipSha256": "66848ab3fb9a161686b64e9f89b66941d9aaf5860e391419e559976aa70ee3c9",
+  "portableZipBytes": 18797487
+}

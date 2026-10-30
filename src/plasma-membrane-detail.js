@@ -31,7 +31,29 @@ function tailGeometry(thickness,detail){
  for(let i=0;i<indices.length;i+=3)[indices[i+1],indices[i+2]]=[indices[i+2],indices[i+1]];
  const geometry=meshGeometry(positions,indices);geometry.userData={twoClosedTailChains:true,axis:'local -Z toward bilayer interior',localRootNormalOffset:0,localTipNormalOffset:-length,nominalRadius:radius,nominalRootHalfSeparation:thickness*.046,glycerolForkEnvelope:true,representativeCisBend:true,notLipidomicComposition:true,chainRepresentation:'Two coarse acyl envelopes sharing a head region; one extended and one bent. No atoms, double-bond positions, species proportions or measured packing are implied.'};return geometry;
 }
-function capGeometry(source,plane){const a=source.attributes.position,ix=source.index,segments=[],tmp=[V(),V(),V()],eps=1e-8;for(let k=0;k<ix.count;k+=3){for(let j=0;j<3;j++)tmp[j].fromBufferAttribute(a,ix.getX(k+j));const d=tmp.map(p=>plane.distanceToPoint(p)),hits=[];for(let j=0;j<3;j++){const q=(j+1)%3;if((d[j]>eps&&d[q]<-eps)||(d[j]<-eps&&d[q]>eps))hits.push(tmp[j].clone().lerp(tmp[q],d[j]/(d[j]-d[q])));else if(Math.abs(d[j])<=eps)hits.push(tmp[j].clone());}const unique=hits.filter((p,i)=>hits.findIndex(q=>q.distanceToSquared(p)<1e-16)===i);if(unique.length===2&&unique[0].distanceToSquared(unique[1])>1e-16)segments.push(unique);}
+const sectionBounds=new WeakMap();
+const sectionWork={calls:0,boundsRejected:0,trianglesVisited:0,trianglesRejected:0};
+function sourceSectionBounds(source){
+ const position=source.attributes.position,index=source.index;let cached=sectionBounds.get(source);
+ if(!cached||cached.position!==position||cached.index!==index){cached={position,index,version:-1,vertices:Uint32Array.from(new Set(index.array)),box:new THREE.Box3()};sectionBounds.set(source,cached);}
+ if(cached.version!==position.version){const b=cached.box;b.makeEmpty();for(const i of cached.vertices){const x=position.getX(i),y=position.getY(i),z=position.getZ(i);b.min.x=Math.min(b.min.x,x);b.min.y=Math.min(b.min.y,y);b.min.z=Math.min(b.min.z,z);b.max.x=Math.max(b.max.x,x);b.max.y=Math.max(b.max.y,y);b.max.z=Math.max(b.max.z,z);}cached.version=position.version;}
+ return cached.box;
+}
+function capGeometry(source,plane){
+ const a=source.attributes.position,ix=source.index,segments=[],tmp=[V(),V(),V()],eps=1e-8;sectionWork.calls++;
+ // Reject only when a conservative indexed-part AABB cannot meet the plane.
+ // Far extracellular domains do not need a new triangle intersection each frame.
+ const bounds=sourceSectionBounds(source),n=plane.normal,c=plane.constant;
+ const cx=(bounds.min.x+bounds.max.x)*.5,cy=(bounds.min.y+bounds.max.y)*.5,cz=(bounds.min.z+bounds.max.z)*.5;
+ const radius=Math.abs(n.x)*(bounds.max.x-bounds.min.x)*.5+Math.abs(n.y)*(bounds.max.y-bounds.min.y)*.5+Math.abs(n.z)*(bounds.max.z-bounds.min.z)*.5;
+ if(bounds.isEmpty()||Math.abs(n.x*cx+n.y*cy+n.z*cz+c)>radius+eps){sectionWork.boundsRejected++;return meshGeometry([],[]);}
+ for(let k=0;k<ix.count;k+=3){
+  sectionWork.trianglesVisited++;const i0=ix.getX(k),i1=ix.getX(k+1),i2=ix.getX(k+2);
+  const d0=n.x*a.getX(i0)+n.y*a.getY(i0)+n.z*a.getZ(i0)+c,d1=n.x*a.getX(i1)+n.y*a.getY(i1)+n.z*a.getZ(i1)+c,d2=n.x*a.getX(i2)+n.y*a.getY(i2)+n.z*a.getZ(i2)+c;
+  if(d0>eps&&d1>eps&&d2>eps||d0< -eps&&d1< -eps&&d2< -eps){sectionWork.trianglesRejected++;continue;}
+  tmp[0].fromBufferAttribute(a,i0);tmp[1].fromBufferAttribute(a,i1);tmp[2].fromBufferAttribute(a,i2);
+  const d=[d0,d1,d2],hits=[];for(let j=0;j<3;j++){const q=(j+1)%3;if((d[j]>eps&&d[q]<-eps)||(d[j]<-eps&&d[q]>eps))hits.push(tmp[j].clone().lerp(tmp[q],d[j]/(d[j]-d[q])));else if(Math.abs(d[j])<=eps)hits.push(tmp[j].clone());}const unique=hits.filter((p,i)=>hits.findIndex(q=>q.distanceToSquared(p)<1e-16)===i);if(unique.length===2&&unique[0].distanceToSquared(unique[1])>1e-16)segments.push(unique);
+ }
  if(!segments.length)return meshGeometry([],[]);const tangent=Math.abs(plane.normal.z)<.8?V(0,0,1).cross(plane.normal).normalize():V(1,0,0).cross(plane.normal).normalize(),across=plane.normal.clone().cross(tangent).normalize(),nodes=[],map=new Map(),adj=[];const id=p=>{const coordinates=p.toArray(),cell=coordinates.map(v=>Math.round(v*1e6)),key=cell.join(',');if(map.has(key))return map.get(key);const nearby=coordinates.map((v,i)=>{const delta=v*1e6-cell[i];return Math.abs(Math.abs(delta)-.5)<=.001?[cell[i],cell[i]+Math.sign(delta)]:[cell[i]];});for(const x of nearby[0])for(const y of nearby[1])for(const z of nearby[2]){const existing=map.get(x+','+y+','+z);if(existing!==undefined&&nodes[existing].distanceToSquared(p)<=1e-18){map.set(key,existing);return existing;}}const index=nodes.length;map.set(key,index);nodes.push(p);adj.push([]);return index;};for(const [p,q]of segments){const a=id(p),b=id(q);if(a===b)continue;adj[a].push(b);adj[b].push(a);}const used=new Set(),loops=[];for(let start=0;start<nodes.length;start++){if(used.has(start)||adj[start].length!==2)continue;const loop=[];let cur=start,prev=-1;for(let guard=0;guard<nodes.length+2;guard++){const neighbours=adj[cur];if(used.has(cur)||!neighbours)break;used.add(cur);loop.push(cur);const next=neighbours.find(x=>x!==prev);if(next===undefined)break;prev=cur;cur=next;if(cur===start)break;}if(cur===start&&loop.length>=3)loops.push(loop);}
  const flat=loops.map(ids=>ids.map(i=>new THREE.Vector2(nodes[i].dot(tangent),nodes[i].dot(across)))),inside=(p,poly)=>{let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++)if((poly[i].y>p.y)!==(poly[j].y>p.y)&&p.x<(poly[j].x-poly[i].x)*(p.y-poly[i].y)/(poly[j].y-poly[i].y)+poly[i].x)c=!c;return c;},areas=flat.map(poly=>Math.abs(THREE.ShapeUtils.area(poly))),parent=flat.map((poly,i)=>{let p=-1,area=Infinity;for(let j=0;j<flat.length;j++)if(areas[j]>areas[i]&&areas[j]<area&&inside(poly[0],flat[j])){p=j;area=areas[j];}return p;}),depth=parent.map((_,i)=>{let d=0,j=parent[i];while(j>=0){d++;j=parent[j];}return d;}),positions=[],indices=[];
  for(let i=0;i<loops.length;i++){if(depth[i]%2)continue;const children=loops.map((_,j)=>j).filter(j=>parent[j]===i&&depth[j]%2),all=[i,...children],base=positions.length/3;for(const l of all)for(const n of loops[l])positions.push(...nodes[n].clone().addScaledVector(plane.normal,.00002).toArray());const tris=THREE.ShapeUtils.triangulateShape(flat[i].map(p=>p.clone()),children.map(j=>flat[j].map(p=>p.clone())));for(const t of tris)indices.push(base+t[0],base+t[2],base+t[1]);}const f32=new Float32Array(positions),clean=[],pa=V(),pb=V(),pc=V();for(let k=0;k<indices.length;k+=3){const a=indices[k],b=indices[k+1],c=indices[k+2];pa.fromArray(f32,a*3);pb.fromArray(f32,b*3);pc.fromArray(f32,c*3);const cross=pb.sub(pa).cross(pc.sub(pa));if(cross.lengthSq()<1e-20)continue;if(cross.dot(plane.normal)<0)clean.push(a,b,c);else clean.push(a,c,b);}const colors=new Float32Array(f32.length);colors.fill(1);return meshGeometry(f32,clean,colors);}
@@ -134,7 +156,7 @@ function receptorPartGeometry(patch,index,lo,hi){
  const h=patch.holes[index],half=patch.half,whole=smoothProteinProfile([[-.30,0],[-.28,.65],[-.23,1.35],[-.17,1.65],[-.11,1.0],[-half,1],[0,1],[half,1],[.10,.88],[.16,1.45],[.23,1.40],[.30,1.20],[.35,1.0],[.40,1.18],[.47,1.35],[.54,.95],[.58,0]],half),profile=whole.filter(r=>r[0]>=lo-1e-9&&r[0]<=hi+1e-9),n=patch.domain.loops[index+1].length,p=[],ix=[],records=[];
  for(const [z,scale]of profile){const outside=Math.max(0,Math.abs(z)-half),bend=z>half?.045*Math.sin((z-half)*4.2):z< -half?-.045*Math.sin((-z-half)*6):0,lean=z>half?.018*Math.sin((z-half)*6.2):0,begin=p.length/3;
   if(scale===0){p.push(...patch.surface(h.x+bend,h.y+lean).clone().addScaledVector(patch.normalAt(h.x+bend,h.y+lean),z).toArray());records.push({start:begin,count:1});}
-  else{for(let j=0;j<n;j++){const xy=patch.domain.xy[patch.domain.loops[index+1][j]],a=Math.atan2(xy[1]-h.y,xy[0]-h.x),lobe=1+Math.min(.12,outside*.7)*Math.cos(3*a+z*7),ecc=Math.min(.14,outside*.8),x=h.x+(xy[0]-h.x)*scale*lobe*(1+ecc)+bend,y=h.y+(xy[1]-h.y)*scale*lobe*(1-ecc*.55)+lean,v=patch.surface(x,y).clone().addScaledVector(patch.normalAt(x,y),z);p.push(...v.toArray());}records.push({start:begin,count:n});}
+  else{for(let j=0;j<n;j++){const xy=patch.domain.xy[patch.domain.loops[index+1][j]],a=Math.atan2(xy[1]-h.y,xy[0]-h.x),domain=z>=.10&&z<=.58,local=domain?(z<.35?(z-.10)/.25:(z-.35)/.23):0,face=domain?Math.sin(Math.PI*local)**2:0,lobe=domain?1+.022*face*Math.cos(2*a):1+Math.min(.12,outside*.7)*Math.cos(3*a+z*7),ecc=Math.min(.14,outside*.8),x=h.x+(xy[0]-h.x)*scale*lobe*(1+ecc+.12*face)+bend,y=h.y+(xy[1]-h.y)*scale*lobe*(1-ecc*.55-.30*face)+lean,v=patch.surface(x,y).clone().addScaledVector(patch.normalAt(x,y),z);p.push(...v.toArray());}records.push({start:begin,count:n});}
  }
  for(let k=0;k<records.length-1;k++)for(let j=0;j<n;j++){const next=(j+1)%n,a=records[k],b=records[k+1];if(a.count===1)ix.push(a.start,b.start+next,b.start+j);else if(b.count===1)ix.push(a.start+j,a.start+next,b.start);else ix.push(a.start+j,a.start+next,b.start+j,a.start+next,b.start+next,b.start+j);}
  for(const [k,sign]of [[0,-1],[records.length-1,1]]){const r=records[k];if(r.count===1)continue;const centre=V();for(let j=0;j<n;j++)centre.add(V().fromArray(p,(r.start+j)*3));centre.divideScalar(n);const c=p.length/3;p.push(...centre.toArray());for(let j=0;j<n;j++){const a=r.start+j,b=r.start+(j+1)%n;if(sign<0)ix.push(c,b,a);else ix.push(c,a,b);}}
@@ -145,6 +167,38 @@ function mappedGeometry(geometry,patch,offset=V(),scale=V(1,1,1)){
  const a=geometry.attributes.position,p=V();for(let i=0;i<a.count;i++){p.fromBufferAttribute(a,i).multiply(scale).add(offset);const q=patch.surface(p.x,p.y).addScaledVector(patch.normalAt(p.x,p.y),p.z);a.setXYZ(i,q.x,q.y,q.z);}geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();geometry.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(a.count*3).fill(1),3));return geometry;
 }
 function ellipsoid(patch,centre,radii,detail){return mappedGeometry(new THREE.SphereGeometry(1,detail?20:12,detail?14:8),patch,centre,radii);}
+// Broad paired faces suggest an Ig beta-sandwich domain. These are coarse
+// domain volumes, not invented atom positions or an interpolated PDB surface.
+function igDomain(patch,centre,radii,detail,rotation=null,tint=1){
+ const g=new THREE.SphereGeometry(1,detail?24:16,detail?16:10),a=g.attributes.position,p=V();
+ for(let i=0;i<a.count;i++){
+  p.fromBufferAttribute(a,i);p.y=Math.sign(p.y)*Math.pow(Math.abs(p.y),.70);p.x+=.065*p.z*(1-p.z*p.z);p.multiply(radii);if(rotation)p.applyQuaternion(rotation);p.add(centre);a.setXYZ(i,p.x,p.y,p.z);
+ }
+ mappedGeometry(g,patch);if(tint!==1){const c=g.attributes.color;for(let i=0;i<c.count;i++)c.setXYZ(i,tint,tint,tint);}
+ return g;
+}
+function combineProteinDomains(parts){const g=mergeGeometries(parts,false);if(!g)throw Error('Protein domain attributes differ');parts.forEach(p=>p.dispose());g.computeBoundingBox();g.computeBoundingSphere();return g;}
+function iggFcGeometry(patch,fc,detail){
+ const parts=[];
+ for(const side of[-1,1]){
+  // CH2 is adjacent to the lower hinge/receptor-binding region; the paired
+  // CH3 domains are farther from the Fab arms. The solvent cleft stays open.
+  const tint=side<0?.94:1.04;
+  parts.push(igDomain(patch,fc.clone().add(V(-.003,side*.027,.025)),V(.066,.024,.055),detail,null,tint));
+  parts.push(igDomain(patch,fc.clone().add(V(.008,side*.024,-.055)),V(.045,.022,.040),detail,null,tint));
+  parts.push(parameterTube(patch,[fc.clone().add(V(.006,side*.025,-.029)),fc.clone().add(V(.002,side*.028,-.003))],.013,detail));
+ }
+ return combineProteinDomains(parts);
+}
+function iggFabGeometry(patch,fc,side,detail){
+ const start=fc.clone().add(V(.03,0,.04)),end=fc.clone().add(V(.15,side*.105,.20)),axis=end.clone().sub(start).normalize(),rotation=new THREE.Quaternion().setFromUnitVectors(V(0,0,1),axis),cross=V(1,0,0).applyQuaternion(rotation),parts=[];
+ for(const t of[.32,.76])for(const chain of[-1,1]){
+  const centre=start.clone().lerp(end,t).addScaledVector(cross,chain*.018);
+  parts.push(igDomain(patch,centre,V(.022,.028,.050),detail,rotation,chain<0?.95:1.04));
+ }
+ parts.push(parameterTube(patch,[fc.clone().add(V(0,side*.027,.050)),start,start.clone().lerp(end,.35)],.014,detail));
+ return combineProteinDomains(parts);
+}
 function closedTube(points,radius,detail){
  const curve=new THREE.CatmullRomCurve3(points,false,'centripetal'),rows=detail?32:20,sides=detail?10:8,frames=curve.computeFrenetFrames(rows,false),p=[],ix=[];
  for(let i=0;i<=rows;i++){const c=curve.getPointAt(i/rows);for(let j=0;j<sides;j++){const a=j/sides*TAU,q=c.clone().addScaledVector(frames.normals[i],radius*Math.cos(a)).addScaledVector(frames.binormals[i],radius*Math.sin(a));p.push(...q.toArray());}}
@@ -280,9 +334,9 @@ export function buildPlasmaMembraneDetail(group,detail,ctx){
   {id:'stalk',role:'extracellular-linker',color:'#a48aa6',geometry:receptorPartGeometry(patch,0,patch.half,.10)},
   {id:'cytoplasmic-tail',role:'cytoplasmic-ITAM-containing-tail-unphosphorylated',color:'#92719a',geometry:parameterTube(patch,[V(rh.x,rh.y,-.055),V(rh.x-.028,rh.y+.018,-.12),V(rh.x+.015,rh.y+.035,-.21),V(rh.x-.04,rh.y+.04,-.34)],.019,detail)},
   ...[-.18,-.28].map((z,i)=>({id:'ITAM-tyrosine-'+(i+1),role:'unphosphorylated-ITAM-site-symbol',color:'#ca9bc5',geometry:ellipsoid(patch,V(rh.x+(i?-.015:.008),rh.y+.035,z),V(.029,.028,.027),detail)}))
- ];const receptor=mergeNamed(receptorParts,'HumanFcGammaRIIA_1TM_2ExtracellularIgDomains',{namedProtein:'FCGR2A',transmembraneHelices:1,extracellularIgDomains:2,cytoplasmicMotif:'own ITAM; unphosphorylated in this binding-only example',notCrosslinked:true});receptorParent.add(receptor.mesh);
+ ];const receptor=mergeNamed(receptorParts,'HumanFcGammaRIIA_1TM_2ExtracellularIgDomains',{namedProtein:'FCGR2A',transmembraneHelices:1,extracellularIgDomains:2,domainEnvelope:'two flattened Ig beta-sandwich teaching volumes; no atomic surface claim',cytoplasmicMotif:'own ITAM; unphosphorylated in this binding-only example',notCrosslinked:true});receptorParent.add(receptor.mesh);
  // IgG Fc contacts the membrane-proximal D2 face. Fab arms point away from Fc.
- const fc=V(rh.x+.205,rh.y-.008,.32),iggParts=[{id:'Fc',role:'IgG-Fc-binding-region',color:'#e4ad65',geometry:ellipsoid(patch,fc,V(.066,.055,.091),detail)},...[-1,1].map((s,i)=>({id:'Fab-'+i,role:'IgG-Fab-arm',color:'#e7bd84',geometry:parameterTube(patch,[fc.clone().add(V(.03,0,.04)),fc.clone().add(V(.10,s*.055,.12)),fc.clone().add(V(.15,s*.105,.20))],.036,detail)}))],igg=mergeNamed(iggParts,'IgG_BindingAndDissociationOnly',{ligand:'IgG',noActivationOrPhagocytosisClaim:true});receptorParent.add(igg.mesh);
+ const fc=V(rh.x+.205,rh.y-.008,.32),iggParts=[{id:'Fc',role:'paired-heavy-chain-CH2-CH3-Fc-binding-region',color:'#e4ad65',geometry:iggFcGeometry(patch,fc,detail)},...[-1,1].map((s,i)=>({id:'Fab-'+i,role:'paired-variable-and-constant-Fab-domains',color:'#e7bd84',geometry:iggFabGeometry(patch,fc,s,detail)}))],igg=mergeNamed(iggParts,'IgG_BindingAndDissociationOnly',{ligand:'IgG',fcHeavyChainDomains:4,fabIgDomainsPerArm:4,displayGeometry:'coarse domain envelopes, no atomic coordinates',noActivationOrPhagocytosisClaim:true});receptorParent.add(igg.mesh);
  const channelParent=new THREE.Group();channelParent.name='P2X7RepresentativeTrimer';channelParent.userData={organelleId:'membrane',componentKey:'membrane-proteins',namedProtein:'P2RX7',biologicalSubunitCount:3,topologyReferenceSpecies:'rat',humanMacrophageContext:true};group.add(channelParent);const ch=holes[1],palette=['#6395a5','#bd907e','#91a187'],coreParts=[],openGeometries=[];
  for(let s=0;s<3;s++)for(const role of['TM2-pore-lining','TM1-peripheral']){coreParts.push({id:'subunit-'+(s+1)+'-'+role,role,color:new THREE.Color(palette[s]).multiplyScalar(role==='TM2-pore-lining'?1.13:.88),geometry:p2xCorePart(patch,1,s,role,0)});openGeometries.push(p2xCorePart(patch,1,s,role,1));}
  const openMerged=mergeGeometries(openGeometries,false),coreOpen=openMerged.attributes.position.array.slice(),coreOpenNormals=openMerged.attributes.normal.array.slice();openMerged.dispose();openGeometries.forEach(g=>g.dispose());const channel=mergeNamed(coreParts,'P2X7_ThreeSubunits_SixTransmembraneEnvelopes',{namedProtein:'P2RX7',biologicalSubunitCount:3,transmembraneHelicesPerSubunit:2,transmembraneHelicesTotal:6,aqueousPore:true,closedGateIsConstriction:true});channelParent.add(channel.mesh);const coreClosed=channel.mesh.geometry.attributes.position.array.slice(),coreClosedNormals=channel.mesh.geometry.attributes.normal.array.slice();

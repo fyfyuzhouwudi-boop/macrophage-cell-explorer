@@ -1,5 +1,6 @@
 // A local teaching reconstruction, informed by structural work rather than an
 // atomistic or macrophage-specific EM segmentation. All motion is seekable.
+import { addRibosomeDomains, addSec61Domains } from './protein-surface-detail.js';
 export function buildSynthesisLesson(g, ctx) {
   const { THREE, V, clamp, ease, material, mesh, ball, rod, connect, tube,
     guideRoute, label, focus, getProgress } = ctx;
@@ -56,10 +57,7 @@ export function buildSynthesisLesson(g, ctx) {
 
   function ribosome(parent, name, at, scale = 1) {
     const group = new THREE.Group(); group.name = name; group.position.copy(at); group.scale.setScalar(scale); parent.add(group);
-    ball(group, name + '60SLargeSubunit', .106, purple, V(0, .07, .015), V(1.15, .8, .9));
-    ball(group, name + '40SSmallSubunit', .079, smallPurple, V(.035, .192, .045), V(1.12, .65, .8));
-    // A few grooves suggest domains; these are not individual rRNA helices.
-    for (const x of [-.047, .035]) rod(group, name + 'SubunitSurfaceGroove', V(x, .03, .094), V(x + .023, .105, .097), .012, smallPurple);
+    addRibosomeDomains(group, name, purple, smallPurple, { active: name === 'ActiveRibosome80S' });
     return group;
   }
   function protein(parent, name, size = 1) {
@@ -101,12 +99,7 @@ export function buildSynthesisLesson(g, ctx) {
   const activeRibo = ribosome(er, 'ActiveRibosome80S', V(-.17, .62, -.26), 1.35);
   const translocon = new THREE.Group(); translocon.name = 'Sec61TransloconSchematic'; translocon.position.set(-.17, .62, -.26); er.add(translocon);
   const transloconMat = material(0x597d79);
-  const channel = mesh(translocon, 'Sec61ProteinConductingPore', new THREE.TorusGeometry(.075, .035, 8, 24), transloconMat);
-  channel.rotation.x = Math.PI / 2;
-  for (let k = 0; k < 3; k++) {
-    const a = k / 3 * Math.PI * 2;
-    ball(translocon, 'Sec61CoarseSubunit' + k, .044, transloconMat, V(Math.cos(a) * .085, -.024, Math.sin(a) * .085), V(.7, 1.5, .8));
-  }
+  addSec61Domains(translocon, 'Sec61', transloconMat, material(0x78958a));
   const mRNA = tube(activeRibo, 'mRNAAlongSmallSubunit', [V(-.28, .2, .04), V(-.09, .23, .11), V(.1, .2, .12), V(.3, .16, .08)], .018, material(0x708c73));
   const erProtein = protein(er, 'NewSecretoryProteinInER', .64); erProtein.group.position.set(-.17, .39, -.245);
   const peptide = [];
@@ -313,7 +306,7 @@ export function buildSynthesisLesson(g, ctx) {
     const step = local.step, actor = step === 0 ? erProtein.group : step === 2 ? golgiProtein.group : step === 4 ? local.u < .24 ? dockedPayload.group : released.group : payload.group;
     return actor.getWorldPosition(V()).add(V(0, 0, .17));
   }, '#ae7e38');
-  label('sec61-machinery', 'Sec61 · 跨膜通道', '核糖体出口与 Sec61 对接；本课所选新生肽链经蛋白通道进入 ER 腔，未穿过裸露的疏水脂质核心。', () => translocon.getWorldPosition(V()).add(V(.08, .08, .13)), '#648b70', () => local.step === 0);
+  label('sec61-machinery', 'Sec61 · 十跨膜螺旋通道', '深绿十螺旋表示 Sec61α，浅绿为 β/γ 辅助拓扑；可见中央通路与 TM2/TM7 侧向缝。所选分泌肽链走中央通路进入 ER 腔，侧门不在此演示为均匀扩张。形体为结构关系粗化，并非原子拟合。', () => translocon.getWorldPosition(V()).add(V(.08, .08, .13)), '#648b70', () => local.step === 0);
   label('copii-machinery', 'COPII · 内外两层衣被', '橄榄色是 Sar1–Sec23/24 内层的粗化符号；金色支架是 Sec13/31 外层。两层均在胞质侧，货物在膜腔内。', () => transit.getWorldPosition(V()).add(V(0, .32, .1)), '#a58b4e', () => local.step === 1 && local.u < .74);
   label('golgi-enzyme', '腔内糖链加工酶', '绿色催化部分朝向 Golgi 腔，作用于所选糖蛋白；绿色分支是糖链符号，不表示此刻所有残基都只被添加。', () => enzyme.getWorldPosition(V()), '#648b70', () => local.step === 2);
   label('fusion-machinery', 'SNARE 装配 / 融合孔', '短杆提示通用 SNARE 装配，后续开放的孔将载体腔与胞外连通。本图不把神经元实验中的特定蛋白组合当成巨噬细胞的唯一组合。', () => surface.localToWorld(V(-.02, 0, .13)), '#648b70', () => local.step === 4);
@@ -324,6 +317,8 @@ export function buildSynthesisLesson(g, ctx) {
     motion: () => local.micro,
     diagnostics: () => ({ type: 'DetailedSecretoryPathwayTableau', stage: local.step, progressWithinStage: local.u,
       currentMotion: local.micro?.title, thickOpaqueCisternae: true, twoSubunitRibosomes: true, nativeSec61Inspired: true,
+      ribosomeDomainEnvelopes: true, ribosomeIsRibonucleoprotein: true, sec61AlphaTransmembraneHelices: 10,
+      staticProteinPartsMerged: true,
       coatLayersSeparated: true, carrierLeavesAfterNeckScission: true, realAnimatedFusionAperture: true,
       activeStageLayout: true, fusionAssemblyCoordinateFrame: 'FusionAssemblyCoordinateFrame', fusionAssemblyObliqueAngle: -.65,
       cargoCrossesCompleteMembrane: false, golgiProcessingNotMembranePenetration: true,

@@ -68,12 +68,19 @@ export function createContinuousPhagocyticRoute({detail=true}={}){
   }
   mid=makeMid(A_ROUTE_EVENT);const post=postProfiles(mid);vesMid=post.low;motherMid=post.up;
   const preGeometry=createWall(mid,false,'continuous-connected-cup-neck-background'),vesicleGeometry=createWall(vesMid,true,'post-scission-closed-phagosome'),motherGeometry=createWall(motherMid,false,'post-scission-sealed-mother-patch');
-  let preMeshes=null;
+  let appliedShapeProgress=NaN,geometryUpdates=0;
   function update(p){
     p=cl(p);state.progress=p;state.scission=p>=A_ROUTE_EVENT;state.phase=p<.08?'contact_on_connected_membrane':p<.46?'open_connected_cup_growth':p<A_ROUTE_EVENT?'open_connected_neck_constriction':'closed_phagosome_transport';
-    mid=makeMid(Math.min(p,A_ROUTE_EVENT));preNormals=meridianNormals(mid);
-    updateWall(preGeometry,mid);
-    if(state.scission){const q=postProfiles(mid);vesMid=q.low;motherMid=q.up;state.transport.set(-.27*sm((p-.62)/.18),-.10*sm((p-.62)/.18),-splitShift-.55*sm((p-.62)/.18));updateWall(vesicleGeometry,vesMid);updateWall(motherGeometry,motherMid);}
+    // Approach and post-scission transport do not change membrane shape.
+    // Preserve exact geometry while moving the host-owned closed compartment;
+    // no identical vertex/normal buffers are rebuilt or uploaded during digestion.
+    const shapeProgress=Math.max(.08,Math.min(p,A_ROUTE_EVENT));
+    if(shapeProgress!==appliedShapeProgress){
+      mid=makeMid(shapeProgress);preNormals=meridianNormals(mid);updateWall(preGeometry,mid);
+      if(state.scission){const q=postProfiles(mid);vesMid=q.low;motherMid=q.up;updateWall(vesicleGeometry,vesMid);updateWall(motherGeometry,motherMid);}
+      appliedShapeProgress=shapeProgress;geometryUpdates++;
+    }
+    if(state.scission){state.transport.set(-.27*sm((p-.62)/.18),-.10*sm((p-.62)/.18),-splitShift-.55*sm((p-.62)/.18));}
     else{state.transport.set(0,0,0);}
     state.particleCenter.copy(state.cupCenter).add(state.transport);state.particleCenter.z+=.28*(1-sm(p/.08));
     return state;
@@ -91,5 +98,5 @@ export function createContinuousPhagocyticRoute({detail=true}={}){
   }
   function sampleCup(theta,phi){const r=radius,point=V(r*Math.sin(theta)*Math.cos(phi),r*Math.sin(theta)*Math.sin(phi),state.cupCenter.z-r*Math.cos(theta)).add(state.transport),normal=V(Math.sin(theta)*Math.cos(phi),Math.sin(theta)*Math.sin(phi),-Math.cos(theta));return {point,normal};}
   update(0);
-  return {getMeridian:()=>({mid:mid.map(p=>({...p})),vesicle:vesMid.map(p=>({...p})),mother:motherMid.map(p=>({...p}))}),preGeometry,vesicleGeometry,motherGeometry,update,sampleMembrane,sampleCup,state,radius,nc,cutRow,cols,totalRows:mid.length-1,event:A_ROUTE_EVENT,metadata:{teachingOnly:true,independentLocalMembrane:true,notWholeMembraneRemeshing:true,sharedIndexedOpenCup:true,scissionModel:'Instantaneous finite-neck topology change; molecular scission machinery and fluid mechanics are not simulated',outerPerimeterRole:'Artificial crop closure of a finite membrane patch',maxCargoReceptorScissionJump:splitShift,capCorner:corner,sourceEvidence:['https://pubmed.ncbi.nlm.nih.gov/24914558/','https://pubmed.ncbi.nlm.nih.gov/8760816/','https://pmc.ncbi.nlm.nih.gov/articles/PMC2984174/']}};
+  return {get geometryUpdates(){return geometryUpdates;},getMeridian:()=>({mid:mid.map(p=>({...p})),vesicle:vesMid.map(p=>({...p})),mother:motherMid.map(p=>({...p}))}),preGeometry,vesicleGeometry,motherGeometry,update,sampleMembrane,sampleCup,state,radius,nc,cutRow,cols,totalRows:mid.length-1,event:A_ROUTE_EVENT,metadata:{teachingOnly:true,independentLocalMembrane:true,notWholeMembraneRemeshing:true,sharedIndexedOpenCup:true,scissionModel:'Instantaneous finite-neck topology change; molecular scission machinery and fluid mechanics are not simulated',outerPerimeterRole:'Artificial crop closure of a finite membrane patch',maxCargoReceptorScissionJump:splitShift,capCorner:corner,sourceEvidence:['https://pubmed.ncbi.nlm.nih.gov/24914558/','https://pubmed.ncbi.nlm.nih.gov/8760816/','https://pmc.ncbi.nlm.nih.gov/articles/PMC2984174/']}};
 }

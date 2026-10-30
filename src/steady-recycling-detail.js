@@ -1,5 +1,6 @@
 // Local teaching geometry. Positions and timing are deliberately expanded;
 // the shapes distinguish membrane topology, not a measured single cell.
+import { addCathepsinDomains, addVAtpaseDomains } from './protein-surface-detail.js';
 export function buildRecyclingLesson(g,ctx){
  const {THREE,V,clamp,ease,material,mesh,ball,rod,connect,tube,receptor,guideRoute,membranePanel,label,focus,getProgress}=ctx;
  const blue=0x779ba5,purple=0xa08daf,amber=0xba833e,green=0x438675;
@@ -54,12 +55,9 @@ export function buildRecyclingLesson(g,ctx){
   const root=new THREE.Group();root.name=name;root.position.copy(pos);root.rotation.z=rotation;parent.add(root);
   const pumpMat=material(0x5b746e),capMat=material(0xd2b585);
   // +Y is cytoplasm. V1 remains outside and the V0 ring spans the membrane.
-  mesh(root,name+'V0MembraneRing',new THREE.TorusGeometry(.078,.035,7,20),pumpMat).rotation.x=Math.PI/2;
-  rod(root,name+'RotorAxle',V(0,-.05,0),V(0,.24,0),.022,pumpMat);
-  for(let i=0;i<6;i++){const a=i*Math.PI/3;ball(root,name+'V1ATPaseSubunit'+i,.061,capMat,V(Math.cos(a)*.08,.23,Math.sin(a)*.08),V(.8,1,.8));}
-  rod(root,name+'PeripheralStator',V(.11,.015,0),V(.11,.22,0),.015,pumpMat);
+  addVAtpaseDomains(root,name,pumpMat,capMat);
   const proton=ball(root,name+'ProtonTeachingSymbol',.041,material(0xc96758),V(0,.14,.14));
-  root.userData={v1Side:'cytosolic',v0SpansMembrane:true,protonSymbolNotAtomistic:true};
+  root.userData={...root.userData,v1Side:'cytosolic',v0SpansMembrane:true,protonSymbolNotAtomistic:true};
   return{root,proton};
  }
  function hydrolase(parent,name,pos,scale=1){
@@ -68,11 +66,8 @@ export function buildRecyclingLesson(g,ctx){
   const mat=material(active?0x2e646a:0xb3a5bf),edge=material(active?0x9ebcb5:0xc4b9ce);
   // Coarse two-lobed cathepsin-B-type protease with a visible substrate cleft.
   // This is NOT a surface reconstructed from PDB coordinates.
-  ball(root,name+'LeftDomain',.15,mat,V(-.1,0,0),V(.8,1.15,.78));
-  ball(root,name+'RightDomain',.14,mat,V(.1,-.015,-.01),V(.8,1,.8));
-  tube(root,name+'CleftBase',[V(-.11,-.12,.02),V(0,-.15,.02),V(.1,-.11,.02)],.035,mat);
-  tube(root,name+'OccludingLoopCue',[V(.09,.07,.06),V(.06,.12,.1),V(.015,.11,.1)],.019,edge);
-  root.userData={representativeHydrolase:'cathepsin B',coarseNotPDBReconstruction:true};return root;
+  addCathepsinDomains(root,name,mat,edge);
+  return root;
  }
  function proteinSegments(parent,name,size){
   const root=new THREE.Group();root.name=name;parent.add(root);const nodes=[],bonds=[],mat=material(amber),bondMat=material(0x94652f),base=[];

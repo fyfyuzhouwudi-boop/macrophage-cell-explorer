@@ -211,3 +211,12 @@ Detailed provenance, specimen limitations, and omissions are recorded in the thr
 - Calder & Rosenthal, 2016, Nat Struct Mol Biol：病毒与靶脂质体的融合快照和膜变形。[DOI 10.1038/nsmb.3271](https://doi.org/10.1038/nsmb.3271)
 
 The present version preserves the accepted HA trajectory and central fusion topology while curving the membrane periphery. Host uptake/endosomal processing uses dedicated solid cutaways. Cutaway openings are observation windows, not biological leaks. Uptake does not establish productive infection; the cytosolic RNA response remains an independent conditional branch. Geometry, scale and timing are pedagogical rather than measured in-situ EM or atomic dynamics.
+
+## Protein-domain refinement · 2026-10-30
+
+- [Ramsland et al. — FcγRIIa–IgG1 Fc, PDB 3RY6](https://www.rcsb.org/structure/3RY6): domain orientation and Fc contact; full IgG shapes are procedural.
+- [Voorhees et al., 2014 — Mammalian ribosome–Sec61](https://pmc.ncbi.nlm.nih.gov/articles/PMC4081569/): translocon and ribosome architecture; the displayed helices are simplified.
+- [Kinesin bound to microtubules](https://pmc.ncbi.nlm.nih.gov/articles/PMC4383081/): motor nucleotide and microtubule binding regions; screen motion remains schematic.
+- [Human cathepsin B, PDB 1HUC](https://www.rcsb.org/structure/1HUC) and [occluding-loop experiment](https://pubmed.ncbi.nlm.nih.gov/8995421/): domain cleft and loop cues; no catalytic atomistic simulation.
+
+These sources constrain selected structure relationships; the new protein shapes are coarse procedural teaching envelopes, not imported atomic-coordinate surfaces.
